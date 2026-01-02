@@ -9,6 +9,7 @@ interface FetchInatOptions {
   center?: { lat: number; lng: number };
   radiusKm?: number;
   recentDays?: number;
+  hasPhotos?: boolean; // true = has photos, false = no photos, undefined = all
 }
 
 /**
@@ -18,7 +19,7 @@ interface FetchInatOptions {
 export async function fetchInat(
   options: FetchInatOptions
 ): Promise<Observation[]> {
-  const { bbox, center, radiusKm, recentDays = 14 } = options;
+  const { bbox, center, radiusKm, recentDays = 14, hasPhotos } = options;
 
   const url = new URL(`${INAT_BASE_URL}/observations`);
 
@@ -44,7 +45,10 @@ export async function fetchInat(
   // Filter parameters
   url.searchParams.set("per_page", "100");
   url.searchParams.set("quality_grade", "research,needs_id");
-  url.searchParams.set("has_photos", "true");
+  // Only set has_photos if explicitly provided (true or false)
+  if (hasPhotos !== undefined) {
+    url.searchParams.set("has_photos", hasPhotos ? "true" : "false");
+  }
   url.searchParams.set("geoprivacy", "open");
   
   // Date filter (recent observations)

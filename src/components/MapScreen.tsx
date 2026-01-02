@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { View, StyleSheet } from "react-native";
+import { View, StyleSheet, TouchableOpacity, Text } from "react-native";
 import MapView, { Region } from "react-native-maps";
 import { useObservationStore } from "../store/observationStore";
 import { ObservationMarker } from "./ObservationMarker";
@@ -8,6 +8,8 @@ import { ObservationSheet } from "./ObservationSheet";
 import { LoadingState } from "./LoadingState";
 import { ErrorState } from "./ErrorState";
 import { ColorLegend } from "./ColorLegend";
+import { FilterSheet } from "./FilterSheet";
+import { countActiveFilters } from "../types/filters";
 
 // Debounce utility
 function useDebounce<T extends (...args: any[]) => void>(
@@ -36,14 +38,17 @@ export const MapScreen: React.FC = () => {
     viewport,
     isLoading,
     error,
+    filters,
     fetchObservationsForViewport,
     setSelectedObservation,
     setViewport,
+    setFilters,
     clearError,
   } = useObservationStore();
 
   const mapRef = useRef<MapView>(null);
   const [showLegend, setShowLegend] = useState(false);
+  const [showFilterSheet, setShowFilterSheet] = useState(false);
 
   // Limit markers at low zoom for performance
   const MAX_MARKERS = 500;
@@ -99,9 +104,32 @@ export const MapScreen: React.FC = () => {
       {error && <ErrorState error={error} onRetry={handleRetry} />}
       <ColorLegend visible={showLegend} />
 
+      {/* Filter Button */}
+      <TouchableOpacity
+        style={styles.filterButton}
+        onPress={() => setShowFilterSheet(true)}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.filterButtonText}>Filter</Text>
+        {countActiveFilters(filters) > 0 && (
+          <View style={styles.filterBadge}>
+            <Text style={styles.filterBadgeText}>
+              {countActiveFilters(filters)}
+            </Text>
+          </View>
+        )}
+      </TouchableOpacity>
+
       <ObservationSheet
         observation={selectedObservation}
         onClose={() => setSelectedObservation(null)}
+      />
+
+      <FilterSheet
+        visible={showFilterSheet}
+        filters={filters}
+        onFiltersChange={setFilters}
+        onClose={() => setShowFilterSheet(false)}
       />
     </View>
   );
@@ -113,6 +141,42 @@ const styles = StyleSheet.create({
   },
   map: {
     flex: 1,
+  },
+  filterButton: {
+    position: "absolute",
+    top: 50,
+    right: 16,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  filterButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#111827",
+  },
+  filterBadge: {
+    backgroundColor: "#3B82F6",
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 6,
+  },
+  filterBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "600",
   },
 });
 

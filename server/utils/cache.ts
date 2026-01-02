@@ -1,8 +1,10 @@
 /**
  * Simple in-memory cache for observations
- * Key: viewport-based string
+ * Key: viewport-based string + filters
  * Value: observations array with timestamp
  */
+
+import type { FilterParams } from "../../src/types/filters";
 
 interface CacheEntry {
   observations: any[];
@@ -13,13 +15,14 @@ const cache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 /**
- * Generate cache key from viewport
+ * Generate cache key from viewport and optional filters
  */
 export function getCacheKey(
   lat: number,
   lng: number,
   latDelta: number,
-  lngDelta: number
+  lngDelta: number,
+  filters?: FilterParams
 ): string {
   // Round to reduce cache fragmentation
   const roundedLat = Math.round(lat * 100) / 100;
@@ -27,7 +30,35 @@ export function getCacheKey(
   const roundedLatDelta = Math.round(latDelta * 1000) / 1000;
   const roundedLngDelta = Math.round(lngDelta * 1000) / 1000;
   
-  return `${roundedLat},${roundedLng},${roundedLatDelta},${roundedLngDelta}`;
+  let key = `${roundedLat},${roundedLng},${roundedLatDelta},${roundedLngDelta}`;
+  
+  // Add filter parameters to cache key if provided
+  if (filters) {
+    const filterParts: string[] = [];
+    
+    if (filters.recency) {
+      filterParts.push(`recency:${filters.recency}`);
+    }
+    if (filters.hasPhoto !== null) {
+      filterParts.push(`hasPhoto:${filters.hasPhoto}`);
+    }
+    if (filters.taxa.length > 0) {
+      // Sort taxa for consistent cache keys
+      const sortedTaxa = [...filters.taxa].sort().join(",");
+      filterParts.push(`taxa:${sortedTaxa}`);
+    }
+    if (filters.provider.length > 0) {
+      // Sort providers for consistent cache keys
+      const sortedProvider = [...filters.provider].sort().join(",");
+      filterParts.push(`provider:${sortedProvider}`);
+    }
+    
+    if (filterParts.length > 0) {
+      key += `|${filterParts.join("|")}`;
+    }
+  }
+  
+  return key;
 }
 
 /**

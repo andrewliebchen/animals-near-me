@@ -1,6 +1,7 @@
 import type { ViewportParams } from "../utils/viewport";
 import type { Observation } from "../types/observation";
 import type { WikipediaSummary } from "../types/wikipedia";
+import type { FilterParams } from "../types/filters";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
@@ -9,10 +10,11 @@ export interface FetchObservationsResponse {
 }
 
 /**
- * Fetch observations from server based on viewport
+ * Fetch observations from server based on viewport and filters
  */
 export async function fetchObservations(
-  viewport: ViewportParams
+  viewport: ViewportParams,
+  filters?: FilterParams
 ): Promise<Observation[]> {
   const params = new URLSearchParams({
     lat: viewport.lat.toString(),
@@ -20,6 +22,22 @@ export async function fetchObservations(
     latDelta: viewport.latDelta.toString(),
     lngDelta: viewport.lngDelta.toString(),
   });
+
+  // Add filter parameters if provided
+  if (filters) {
+    if (filters.recency) {
+      params.set("recency", filters.recency);
+    }
+    if (filters.hasPhoto !== null) {
+      params.set("hasPhoto", filters.hasPhoto ? "true" : "false");
+    }
+    if (filters.taxa.length > 0) {
+      params.set("taxa", filters.taxa.join(","));
+    }
+    if (filters.provider.length > 0) {
+      params.set("provider", filters.provider.join(","));
+    }
+  }
 
   const url = `${API_URL}/observations?${params.toString()}`;
 
