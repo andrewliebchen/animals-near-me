@@ -106,3 +106,4 @@ curl "http://localhost:3000/api/observations?lat=37.7749&lng=-122.4194&latDelta=
 
 This should return JSON with observations array.
 
+

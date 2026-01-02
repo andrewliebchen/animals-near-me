@@ -1,5 +1,6 @@
 import React from "react";
 import { View, ActivityIndicator, StyleSheet, Text } from "react-native";
+import { useTheme } from "../utils/theme";
 
 interface LoadingStateProps {
   message?: string;
@@ -8,10 +9,19 @@ interface LoadingStateProps {
 export const LoadingState: React.FC<LoadingStateProps> = ({
   message = "Loading observations...",
 }) => {
+  const theme = useTheme();
+
+  const dynamicStyles = {
+    text: {
+      ...styles.text,
+      color: theme.text.secondary,
+    },
+  };
+
   return (
     <View style={styles.container}>
       <ActivityIndicator size="large" color="#3B82F6" />
-      <Text style={styles.text}>{message}</Text>
+      <Text style={dynamicStyles.text}>{message}</Text>
     </View>
   );
 };
@@ -28,7 +38,7 @@ const styles = StyleSheet.create({
   text: {
     marginTop: 8,
     fontSize: 14,
-    color: "#6B7280",
   },
 });
+
 

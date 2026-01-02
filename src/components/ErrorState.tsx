@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { useTheme } from "../utils/theme";
 
 interface ErrorStateProps {
   error: string;
@@ -7,8 +8,19 @@ interface ErrorStateProps {
 }
 
 export const ErrorState: React.FC<ErrorStateProps> = ({ error, onRetry }) => {
+  const theme = useTheme();
+
+  const dynamicStyles = {
+    container: {
+      ...styles.container,
+      backgroundColor: theme.background.card,
+      shadowColor: theme.shadow.color,
+      shadowOpacity: theme.shadow.opacity,
+    },
+  };
+
   return (
-    <View style={styles.container}>
+    <View style={dynamicStyles.container}>
       <Text style={styles.errorText}>{error}</Text>
       {onRetry && (
         <TouchableOpacity style={styles.retryButton} onPress={onRetry}>
@@ -25,12 +37,9 @@ const styles = StyleSheet.create({
     top: 100,
     left: 16,
     right: 16,
-    backgroundColor: "white",
     padding: 16,
     borderRadius: 8,
-    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
     zIndex: 1000,
@@ -53,4 +62,5 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
+
 

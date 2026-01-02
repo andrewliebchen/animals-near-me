@@ -51,3 +51,4 @@ If you're seeing module resolution errors after installing new packages:
 - Make sure you're using the correct iOS simulator version
 - Try: `npx expo run:ios` to rebuild native code
 
+

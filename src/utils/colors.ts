@@ -24,3 +24,4 @@ export function getTaxaColor(taxaBucket: TaxaBucket): string {
   return TAXA_COLORS[taxaBucket] || TAXA_COLORS.Other;
 }
 
+

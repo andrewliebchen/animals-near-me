@@ -16,6 +16,7 @@ import type { WikipediaSummary } from "../types/wikipedia";
 import { getTaxaColor } from "../utils/colors";
 import { fetchWikipediaSummary } from "../api/client";
 import { normalizeWikipediaTitle } from "../utils/wikipedia";
+import { useTheme } from "../utils/theme";
 
 interface ObservationSheetProps {
   observation: Observation | null;
@@ -26,6 +27,7 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
   observation,
   onClose,
 }) => {
+  const theme = useTheme();
   const snapPoints = useMemo(() => ["40%", "90%"], []);
   const sheetRef = React.useRef<BottomSheet>(null);
   
@@ -126,6 +128,49 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
     }
   };
 
+  const dynamicStyles = {
+    content: {
+      ...styles.content,
+      backgroundColor: theme.background.card,
+    },
+    imageContainer: {
+      ...styles.imageContainer,
+      backgroundColor: theme.background.secondary,
+    },
+    commonName: {
+      ...styles.commonName,
+      color: theme.text.primary,
+    },
+    scientificName: {
+      ...styles.scientificName,
+      color: theme.text.secondary,
+    },
+    label: {
+      ...styles.label,
+      color: theme.text.secondary,
+    },
+    value: {
+      ...styles.value,
+      color: theme.text.primary,
+    },
+    linkButton: {
+      ...styles.linkButton,
+      backgroundColor: theme.background.button,
+    },
+    wikipediaSection: {
+      ...styles.wikipediaSection,
+      borderTopColor: theme.border,
+    },
+    wikipediaExtract: {
+      ...styles.wikipediaExtract,
+      color: theme.text.primary,
+    },
+    loadingText: {
+      ...styles.loadingText,
+      color: theme.text.secondary,
+    },
+  };
+
   return (
     <>
     <BottomSheet
@@ -135,13 +180,14 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
       enablePanDownToClose
       onClose={onClose}
       enableDynamicSizing={false}
-      handleIndicatorStyle={{ backgroundColor: "#DDD", width: 80 }}
+      handleIndicatorStyle={{ backgroundColor: theme.border, width: 80 }}
+      backgroundStyle={{ backgroundColor: theme.background.card }}
     >
-      <BottomSheetScrollView style={styles.content}>
+      <BottomSheetScrollView style={dynamicStyles.content}>
         {/* Hero Image */}
         {observation.photoUrl && (
           <TouchableOpacity
-            style={styles.imageContainer}
+            style={dynamicStyles.imageContainer}
             onPress={() => setImageViewerVisible(true)}
             activeOpacity={0.9}
           >
@@ -156,11 +202,11 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
         {/* Names and Provider Badge */}
         <View style={styles.header}>
           <View style={styles.nameSection}>
-            <Text style={styles.commonName}>
+            <Text style={dynamicStyles.commonName}>
               {observation.commonName || observation.scientificName || "Unknown"}
             </Text>
             {observation.scientificName && (
-              <Text style={styles.scientificName}>
+              <Text style={dynamicStyles.scientificName}>
                 {observation.scientificName}
               </Text>
             )}
@@ -172,7 +218,7 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
 
         {/* Taxa Bucket */}
         <View style={styles.section}>
-          <Text style={styles.label}>Category</Text>
+          <Text style={dynamicStyles.label}>Category</Text>
           <View style={[styles.taxaChip, { borderColor: color }]}>
             <Text style={[styles.taxaText, { color }]}>
               {observation.taxaBucket}
@@ -182,14 +228,14 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
 
         {/* Observed Date/Time */}
         <View style={styles.section}>
-          <Text style={styles.label}>Observed</Text>
-          <Text style={styles.value}>{formatDate(observation.observedAt)}</Text>
+          <Text style={dynamicStyles.label}>Observed</Text>
+          <Text style={dynamicStyles.value}>{formatDate(observation.observedAt)}</Text>
         </View>
 
         {/* Location */}
         <View style={styles.section}>
-          <Text style={styles.label}>Location</Text>
-          <Text style={styles.value}>
+          <Text style={dynamicStyles.label}>Location</Text>
+          <Text style={dynamicStyles.value}>
             {observation.placeGuess ||
               `${observation.lat.toFixed(4)}, ${observation.lng.toFixed(4)}`}
           </Text>
@@ -198,7 +244,7 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
         {/* External Link */}
         {observation.detailUrl && (
           <TouchableOpacity
-            style={styles.linkButton}
+            style={dynamicStyles.linkButton}
             onPress={handleOpenDetail}
           >
             <Text style={styles.linkText}>View on {providerName} →</Text>
@@ -207,27 +253,27 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
 
         {/* Wikipedia Section */}
         {wikipediaLoading && (
-          <View style={styles.wikipediaSection}>
-            <Text style={styles.label}>About</Text>
+          <View style={dynamicStyles.wikipediaSection}>
+            <Text style={dynamicStyles.label}>About</Text>
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color="#6B7280" />
-              <Text style={[styles.loadingText, { marginLeft: 8 }]}>Loading information...</Text>
+              <ActivityIndicator size="small" color={theme.text.secondary} />
+              <Text style={[dynamicStyles.loadingText, { marginLeft: 8 }]}>Loading information...</Text>
             </View>
           </View>
         )}
 
         {!wikipediaLoading && wikipediaData && wikipediaData.extract && (
-          <View style={styles.wikipediaSection}>
-            <Text style={styles.label}>About</Text>
-            <Text style={styles.wikipediaExtract}>{wikipediaData.extract}</Text>
+          <View style={dynamicStyles.wikipediaSection}>
+            <Text style={dynamicStyles.label}>About</Text>
+            <Text style={dynamicStyles.wikipediaExtract}>{wikipediaData.extract}</Text>
             {wikipediaData.content_urls?.desktop?.page && (
               <TouchableOpacity
-                style={styles.wikipediaLink}
+                style={dynamicStyles.linkButton}
                 onPress={() => {
                   Linking.openURL(wikipediaData.content_urls!.desktop!.page);
                 }}
               >
-                <Text style={styles.wikipediaLinkText}>
+                <Text style={styles.linkText}>
                   Read more on Wikipedia →
                 </Text>
               </TouchableOpacity>
@@ -261,7 +307,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: "hidden",
     marginBottom: 16,
-    backgroundColor: "#f3f4f6",
   },
   heroImage: {
     width: "100%",
@@ -280,13 +325,11 @@ const styles = StyleSheet.create({
   commonName: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#111827",
     marginBottom: 4,
   },
   scientificName: {
     fontSize: 16,
     fontStyle: "italic",
-    color: "#6B7280",
   },
   badge: {
     paddingHorizontal: 12,
@@ -304,14 +347,12 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#6B7280",
     textTransform: "uppercase",
     letterSpacing: 0.5,
     marginBottom: 4,
   },
   value: {
     fontSize: 16,
-    color: "#111827",
   },
   taxaChip: {
     alignSelf: "flex-start",
@@ -327,7 +368,6 @@ const styles = StyleSheet.create({
   linkButton: {
     marginTop: 8,
     padding: 12,
-    backgroundColor: "#F3F4F6",
     borderRadius: 8,
     alignItems: "center",
   },
@@ -342,21 +382,11 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     paddingBottom: 60,
     borderTopWidth: 1,
-    borderTopColor: "#E5E7EB",
   },
   wikipediaExtract: {
     fontSize: 15,
     lineHeight: 22,
-    color: "#374151",
     marginBottom: 12,
-  },
-  wikipediaLink: {
-    marginTop: 8,
-  },
-  wikipediaLinkText: {
-    fontSize: 15,
-    color: "#3B82F6",
-    fontWeight: "600",
   },
   loadingContainer: {
     flexDirection: "row",
@@ -365,7 +395,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 14,
-    color: "#6B7280",
   },
 });
 

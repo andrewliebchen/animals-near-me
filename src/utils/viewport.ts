@@ -29,3 +29,4 @@ export const DEFAULT_REGION: Region = {
   longitudeDelta: 0.5,
 };
 
+
