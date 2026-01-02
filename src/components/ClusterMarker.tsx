@@ -16,12 +16,6 @@ export const ClusterMarker: React.FC<ClusterMarkerProps> = ({
   count,
   onPress,
 }) => {
-  console.log("[ClusterMarker] Rendering cluster:", {
-    coordinate,
-    count,
-    hasOnPress: !!onPress,
-  });
-
   return (
     <Marker
       coordinate={coordinate}

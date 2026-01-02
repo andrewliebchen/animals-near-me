@@ -11,18 +11,24 @@ interface ObservationMarkerProps {
     latitude: number;
     longitude: number;
   };
+  offset?: {
+    lat: number;
+    lng: number;
+  };
 }
 
 export const ObservationMarker: React.FC<ObservationMarkerProps> = ({
   observation,
   onPress,
+  offset,
 }) => {
   const color = getTaxaColor(observation.taxaBucket);
   
   // Expose coordinate prop for clustering library detection
+  // Apply offset if provided to spread out overlapping markers
   const coordinate = {
-    latitude: observation.lat,
-    longitude: observation.lng,
+    latitude: observation.lat + (offset?.lat || 0),
+    longitude: observation.lng + (offset?.lng || 0),
   };
 
   return (

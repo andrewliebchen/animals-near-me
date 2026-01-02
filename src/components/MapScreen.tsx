@@ -53,22 +53,104 @@ export const MapScreen: React.FC = () => {
   const mapRef = useRef<any>(null);
   const [showLegend, setShowLegend] = useState(false);
   const [showFilterSheet, setShowFilterSheet] = useState(false);
+  const isZoomingIntoClusterRef = useRef(false);
+
+  // Filter observations to those within a reasonable distance of current viewport
+  // This keeps cluster counts accurate while preventing memory issues
+  // When zooming into a cluster, use more generous filtering to show all cluster markers
+  const filteredObservations = React.useMemo(() => {
+    if (!viewport) return observations;
+    
+    // When zoomed in (clustering disabled), use more generous padding to show all markers
+    // When zoomed out (clustering enabled), use tighter filtering for performance
+    const isZoomedIn = viewport.latitudeDelta < 0.03;
+    const paddingMultiplier = isZoomedIn ? 5 : 2; // More generous when zoomed in
+    
+    const latPadding = viewport.latitudeDelta * paddingMultiplier;
+    const lngPadding = viewport.longitudeDelta * paddingMultiplier;
+    
+    return observations.filter(obs => {
+      const latDiff = Math.abs(obs.lat - viewport.latitude);
+      const lngDiff = Math.abs(obs.lng - viewport.longitude);
+      return latDiff <= latPadding && lngDiff <= lngPadding;
+    });
+  }, [observations, viewport]);
 
   // Limit markers at low zoom for performance
   const MAX_MARKERS = 500;
-  const displayedObservations = observations.slice(0, MAX_MARKERS);
+  const baseObservations = filteredObservations.slice(0, MAX_MARKERS);
 
-  // Log observation count
-  useEffect(() => {
-    console.log("[MapScreen] Observations:", {
-      total: observations.length,
-      displayed: displayedObservations.length,
-      viewport: viewport ? {
-        latDelta: viewport.latitudeDelta,
-        lngDelta: viewport.longitudeDelta,
-      } : null,
-    });
-  }, [observations.length, displayedObservations.length, viewport]);
+  // Spread out overlapping markers when clustering is disabled (zoomed in)
+  // This prevents markers from stacking on top of each other
+  const displayedObservations = React.useMemo(() => {
+    const isZoomedIn = viewport && viewport.latitudeDelta < 0.03;
+    
+    // Always return consistent structure: { observation, offset }
+    if (!isZoomedIn || baseObservations.length === 0) {
+      return baseObservations.map(obs => ({
+        observation: obs,
+        offset: { lat: 0, lng: 0 },
+      }));
+    }
+
+    // Threshold for considering markers "overlapping" (roughly 10 meters)
+    const OVERLAP_THRESHOLD = 0.0001; // degrees
+    const SPREAD_DISTANCE = 0.00015; // degrees (roughly 15 meters)
+    
+    const processed: Array<{ observation: typeof baseObservations[0]; offset: { lat: number; lng: number } }> = [];
+    const groups: Array<Array<typeof baseObservations[0]>> = [];
+
+    // Group overlapping observations
+    for (const obs of baseObservations) {
+      let addedToGroup = false;
+      
+      for (const group of groups) {
+        const firstInGroup = group[0];
+        const latDiff = Math.abs(obs.lat - firstInGroup.lat);
+        const lngDiff = Math.abs(obs.lng - firstInGroup.lng);
+        
+        if (latDiff < OVERLAP_THRESHOLD && lngDiff < OVERLAP_THRESHOLD) {
+          group.push(obs);
+          addedToGroup = true;
+          break;
+        }
+      }
+      
+      if (!addedToGroup) {
+        groups.push([obs]);
+      }
+    }
+
+    // Apply offsets to overlapping groups
+    for (const group of groups) {
+      if (group.length === 1) {
+        // No overlap, no offset needed
+        processed.push({ observation: group[0], offset: { lat: 0, lng: 0 } });
+      } else {
+        // Spread markers in a circle around the center
+        const centerLat = group.reduce((sum, o) => sum + o.lat, 0) / group.length;
+        const centerLng = group.reduce((sum, o) => sum + o.lng, 0) / group.length;
+        
+        group.forEach((obs, index) => {
+          // Distribute markers evenly in a circle
+          const angle = (index * 2 * Math.PI) / group.length;
+          const latOffset = Math.cos(angle) * SPREAD_DISTANCE;
+          const lngOffset = Math.sin(angle) * SPREAD_DISTANCE;
+          
+          processed.push({
+            observation: obs,
+            offset: {
+              lat: centerLat + latOffset - obs.lat,
+              lng: centerLng + lngOffset - obs.lng,
+            },
+          });
+        });
+      }
+    }
+
+    return processed;
+  }, [baseObservations, viewport]);
+
 
   // Debounced fetch function (500-800ms delay)
   const debouncedFetch = useDebounce(fetchObservationsForViewport, 600);
@@ -76,25 +158,18 @@ export const MapScreen: React.FC = () => {
   // Handle region change
   const handleRegionChangeComplete = useCallback(
     (region: Region, details?: any, markers?: any[]) => {
-      console.log("[handleRegionChangeComplete] Region changed:", {
-        latitude: region.latitude,
-        longitude: region.longitude,
-        latitudeDelta: region.latitudeDelta,
-        longitudeDelta: region.longitudeDelta,
-        hasDetails: !!details,
-        hasMarkers: !!markers,
-        markerCount: markers?.length || 0,
-        clusterCount: markers?.filter((m: any) => m?.properties?.point_count > 0).length || 0,
-        individualMarkerCount: markers?.filter((m: any) => !m?.properties?.point_count || m?.properties?.point_count === 0).length || 0,
-        sampleMarkers: markers?.slice(0, 3).map((m: any) => ({
-          id: m?.id,
-          pointCount: m?.properties?.point_count,
-          hasGeometry: !!m?.geometry,
-          coordinates: m?.geometry?.coordinates,
-        })),
-        allMarkerIds: markers?.map((m: any) => m?.id).slice(0, 10),
-      });
       setViewport(region);
+      
+      // Don't refetch if we're programmatically zooming into a cluster
+      // This prevents markers from disappearing when zooming in
+      if (isZoomingIntoClusterRef.current) {
+        // Reset the flag after a short delay to allow normal fetching to resume
+        setTimeout(() => {
+          isZoomingIntoClusterRef.current = false;
+        }, 1000);
+        return;
+      }
+      
       debouncedFetch(region);
     },
     [debouncedFetch, setViewport]
@@ -114,18 +189,10 @@ export const MapScreen: React.FC = () => {
     }
   }, [viewport, fetchObservationsForViewport, clearError]);
 
-  // Handle cluster press - zoom into cluster
+  // Handle cluster press - zoom into cluster to show all contained markers
   const handleClusterPress = useCallback(
     (cluster: any, markers?: any[]) => {
-      console.log("[handleClusterPress] Called with:", {
-        hasCluster: !!cluster,
-        hasMarkers: !!markers,
-        markerCount: markers?.length || 0,
-        clusterData: cluster,
-      });
-
-      if (!mapRef.current || !cluster) {
-        console.log("[handleClusterPress] Returning early - no mapRef or cluster");
+      if (!mapRef.current || !cluster || !viewport) {
         return;
       }
 
@@ -134,18 +201,16 @@ export const MapScreen: React.FC = () => {
       let clusterLng: number;
       
       if (cluster.coordinate) {
-        // If it's already a coordinate object
         clusterLat = cluster.coordinate.latitude;
         clusterLng = cluster.coordinate.longitude;
       } else if (cluster.geometry && cluster.geometry.coordinates) {
-        // GeoJSON format: [lng, lat]
         clusterLat = cluster.geometry.coordinates[1];
         clusterLng = cluster.geometry.coordinates[0];
       } else {
         return;
       }
 
-      // If we have child markers, calculate bounds; otherwise just zoom in
+      // If we have child markers, use fitToCoordinates to show them all
       if (markers && markers.length > 0) {
         const coordinates = markers
           .map((m: any) => {
@@ -162,65 +227,56 @@ export const MapScreen: React.FC = () => {
           .filter((c: any) => c !== null);
 
         if (coordinates.length > 0) {
-          const latitudes = coordinates.map((c: any) => c.latitude);
-          const longitudes = coordinates.map((c: any) => c.longitude);
+          // Set flag to prevent refetching when zooming into cluster
+          isZoomingIntoClusterRef.current = true;
 
-          const minLat = Math.min(...latitudes);
-          const maxLat = Math.max(...latitudes);
-          const minLng = Math.min(...longitudes);
-          const maxLng = Math.max(...longitudes);
-
-          const latDelta = (maxLat - minLat) * 1.5; // Add padding
-          const lngDelta = (maxLng - minLng) * 1.5;
-
-          const centerLat = (minLat + maxLat) / 2;
-          const centerLng = (minLng + maxLng) / 2;
-
-          mapRef.current.animateToRegion(
-            {
-              latitude: centerLat,
-              longitude: centerLng,
-              latitudeDelta: Math.max(latDelta, 0.01),
-              longitudeDelta: Math.max(lngDelta, 0.01),
+          // Use fitToCoordinates to show all markers with padding
+          mapRef.current.fitToCoordinates(coordinates, {
+            edgePadding: {
+              top: 100,
+              right: 100,
+              bottom: 100,
+              left: 100,
             },
-            300
-          );
+            animated: true,
+          });
           return;
         }
       }
 
-      // Fallback: zoom in on cluster center
-      if (viewport) {
-        mapRef.current.animateToRegion(
-          {
-            latitude: clusterLat,
-            longitude: clusterLng,
-            latitudeDelta: viewport.latitudeDelta * 0.5,
-            longitudeDelta: viewport.longitudeDelta * 0.5,
-          },
-          300
-        );
-      }
+      // Fallback: zoom in significantly on cluster center
+      // Always zoom in by at least 3x (reduce delta by 3x)
+      const newLatDelta = Math.max(0.005, viewport.latitudeDelta / 3);
+      const newLngDelta = Math.max(0.005, viewport.longitudeDelta / 3);
+
+      // Set flag to prevent refetching when zooming into cluster
+      isZoomingIntoClusterRef.current = true;
+
+      mapRef.current.animateToRegion(
+        {
+          latitude: clusterLat,
+          longitude: clusterLng,
+          latitudeDelta: newLatDelta,
+          longitudeDelta: newLngDelta,
+        },
+        300
+      );
     },
     [viewport]
   );
 
   // Render function for clusters
   const renderCluster = useCallback((cluster: any) => {
-    console.log("[renderCluster] Called with cluster:", {
-      hasCluster: !!cluster,
-      hasGeometry: !!cluster?.geometry,
-      hasCoordinates: !!cluster?.geometry?.coordinates,
-      coordinates: cluster?.geometry?.coordinates,
-      pointCount: cluster?.properties?.point_count,
-      id: cluster?.id,
-      fullCluster: cluster,
-    });
+    // Don't render clusters when zoomed in - show individual markers instead
+    // This prevents clusters from obscuring individual markers that users want to tap
+    // Increased threshold so clusters disappear at a higher zoom level
+    if (viewport && viewport.latitudeDelta < 0.03) {
+      return null;
+    }
 
     // The library passes a marker object (GeoJSON feature) with geometry.coordinates [lng, lat] and properties.point_count
     // Format: { geometry: { coordinates: [lng, lat] }, properties: { point_count: number }, id, onPress, ... }
     if (!cluster || !cluster.geometry || !Array.isArray(cluster.geometry.coordinates)) {
-      console.log("[renderCluster] Returning null - missing required data");
       return null;
     }
 
@@ -233,18 +289,9 @@ export const MapScreen: React.FC = () => {
     // Get point count from cluster properties
     const pointCount = cluster.properties?.point_count || 0;
 
-    console.log("[renderCluster] Extracted data:", {
-      coordinate,
-      pointCount,
-      clusterId: cluster.id,
-    });
-
     if (!pointCount || pointCount === 0) {
-      console.log("[renderCluster] Returning null - pointCount is 0");
       return null;
     }
-
-    console.log("[renderCluster] Rendering ClusterMarker with count:", pointCount);
     return (
       <ClusterMarker
         key={`cluster-${cluster.id}`}
@@ -253,7 +300,7 @@ export const MapScreen: React.FC = () => {
         onPress={cluster.onPress || (() => {})}
       />
     );
-  }, []);
+  }, [viewport]);
 
   return (
     <View style={styles.container}>
@@ -265,7 +312,7 @@ export const MapScreen: React.FC = () => {
         showsUserLocation={true}
         showsMyLocationButton={true}
         onLongPress={() => setShowLegend(!showLegend)}
-        clusteringEnabled={true}
+        clusteringEnabled={viewport ? viewport.latitudeDelta >= 0.03 : true}
         clusterColor="#3B82F6"
         clusterTextColor="#FFFFFF"
         radius={60}
@@ -276,29 +323,18 @@ export const MapScreen: React.FC = () => {
         onClusterPress={handleClusterPress}
         renderCluster={renderCluster}
         preserveClusterPressBehavior={true}
-        onMarkersChange={(markers) => {
-          console.log("[onMarkersChange] Markers changed:", {
-            markerCount: markers?.length || 0,
-            clusters: markers?.filter((m: any) => m.properties?.point_count > 0).length || 0,
-            individualMarkers: markers?.filter((m: any) => !m.properties?.point_count || m.properties.point_count === 0).length || 0,
-            sampleMarkers: markers?.slice(0, 3).map((m: any) => ({
-              id: m.id,
-              pointCount: m.properties?.point_count,
-              hasGeometry: !!m.geometry,
-              coordinates: m.geometry?.coordinates,
-            })),
-          });
-        }}
+        spiralEnabled={false}
       >
-        {displayedObservations.map((observation) => (
+        {displayedObservations.map((item) => (
           <ObservationMarker
-            key={observation.id}
-            observation={observation}
+            key={item.observation.id}
+            observation={item.observation}
             onPress={setSelectedObservation}
             coordinate={{
-              latitude: observation.lat,
-              longitude: observation.lng,
+              latitude: item.observation.lat,
+              longitude: item.observation.lng,
             }}
+            offset={item.offset}
           />
         ))}
       </ClusteredMapView>

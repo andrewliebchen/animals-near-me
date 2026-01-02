@@ -55,8 +55,27 @@ export const useObservationStore = create<ObservationState>((set, get) => ({
     try {
       const viewportParams = regionToViewportParams(viewport);
       const filters = get().filters;
-      const observations = await fetchObservations(viewportParams, filters);
-      set({ observations, viewport, isLoading: false });
+      const newObservations = await fetchObservations(viewportParams, filters);
+      
+      // Merge with existing observations instead of replacing
+      // This ensures cluster counts remain accurate when zooming
+      const existingObservations = get().observations;
+      const observationMap = new Map<string, Observation>();
+      
+      // Add existing observations to map
+      existingObservations.forEach(obs => {
+        observationMap.set(obs.id, obs);
+      });
+      
+      // Add/update with new observations
+      newObservations.forEach(obs => {
+        observationMap.set(obs.id, obs);
+      });
+      
+      // Convert back to array
+      const mergedObservations = Array.from(observationMap.values());
+      
+      set({ observations: mergedObservations, viewport, isLoading: false });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Failed to fetch observations";
       set({ error: errorMessage, isLoading: false });
