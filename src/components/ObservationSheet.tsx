@@ -132,6 +132,7 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
       enablePanDownToClose
       onClose={onClose}
       enableDynamicSizing={false}
+      handleIndicatorStyle={{ backgroundColor: "#DDD", width: 80 }}
     >
       <BottomSheetScrollView style={styles.content}>
         {/* Hero Image */}
@@ -234,7 +235,8 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
 const styles = StyleSheet.create({
   content: {
     flex: 1,
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 32,
   },
   imageContainer: {
     width: "100%",
@@ -321,6 +323,7 @@ const styles = StyleSheet.create({
     marginTop: 24,
     marginBottom: 16,
     paddingTop: 24,
+    paddingBottom: 60,
     borderTopWidth: 1,
     borderTopColor: "#E5E7EB",
   },
