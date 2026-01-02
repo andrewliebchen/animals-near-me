@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,10 +7,14 @@ import {
   Linking,
   TouchableOpacity,
   ScrollView,
+  ActivityIndicator,
 } from "react-native";
 import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import type { Observation } from "../types/observation";
+import type { WikipediaSummary } from "../types/wikipedia";
 import { getTaxaColor } from "../utils/colors";
+import { fetchWikipediaSummary } from "../api/client";
+import { normalizeWikipediaTitle } from "../utils/wikipedia";
 
 interface ObservationSheetProps {
   observation: Observation | null;
@@ -23,6 +27,9 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
 }) => {
   const snapPoints = useMemo(() => ["40%", "90%"], []);
   const sheetRef = React.useRef<BottomSheet>(null);
+  
+  const [wikipediaData, setWikipediaData] = useState<WikipediaSummary | null>(null);
+  const [wikipediaLoading, setWikipediaLoading] = useState(false);
 
   React.useEffect(() => {
     if (observation) {
@@ -30,6 +37,62 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
     } else {
       sheetRef.current?.close();
     }
+  }, [observation]);
+
+  // Fetch Wikipedia data when observation changes
+  useEffect(() => {
+    if (!observation) {
+      setWikipediaData(null);
+      setWikipediaLoading(false);
+      return;
+    }
+
+    const fetchWikipedia = async () => {
+      setWikipediaLoading(true);
+      setWikipediaData(null);
+
+      // Try common name first, then scientific name
+      const titlesToTry = [];
+      
+      if (observation.commonName) {
+        const normalizedCommon = normalizeWikipediaTitle(observation.commonName);
+        titlesToTry.push(normalizedCommon);
+      }
+      
+      if (observation.scientificName) {
+        const normalizedScientific = normalizeWikipediaTitle(observation.scientificName);
+        // Only add if different from common name
+        if (!titlesToTry.includes(normalizedScientific)) {
+          titlesToTry.push(normalizedScientific);
+        }
+      }
+
+      if (titlesToTry.length === 0) {
+        setWikipediaLoading(false);
+        return;
+      }
+
+      // Try each title in order
+      for (const title of titlesToTry) {
+        try {
+          const summary = await fetchWikipediaSummary(title);
+          if (summary && summary.extract) {
+            setWikipediaData(summary);
+            setWikipediaLoading(false);
+            return;
+          }
+        } catch (error) {
+          // Continue to next title
+          continue;
+        }
+      }
+
+      // If we get here, no article was found
+      setWikipediaLoading(false);
+      setWikipediaData(null);
+    };
+
+    fetchWikipedia();
   }, [observation]);
 
   if (!observation) {
@@ -133,6 +196,36 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
             <Text style={styles.linkText}>View on {providerName} →</Text>
           </TouchableOpacity>
         )}
+
+        {/* Wikipedia Section */}
+        {wikipediaLoading && (
+          <View style={styles.wikipediaSection}>
+            <Text style={styles.label}>About</Text>
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color="#6B7280" />
+              <Text style={[styles.loadingText, { marginLeft: 8 }]}>Loading information...</Text>
+            </View>
+          </View>
+        )}
+
+        {!wikipediaLoading && wikipediaData && wikipediaData.extract && (
+          <View style={styles.wikipediaSection}>
+            <Text style={styles.label}>About</Text>
+            <Text style={styles.wikipediaExtract}>{wikipediaData.extract}</Text>
+            {wikipediaData.content_urls?.desktop?.page && (
+              <TouchableOpacity
+                style={styles.wikipediaLink}
+                onPress={() => {
+                  Linking.openURL(wikipediaData.content_urls!.desktop!.page);
+                }}
+              >
+                <Text style={styles.wikipediaLinkText}>
+                  Read more on Wikipedia →
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
       </BottomSheetScrollView>
     </BottomSheet>
   );
@@ -223,6 +316,36 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#3B82F6",
     fontWeight: "600",
+  },
+  wikipediaSection: {
+    marginTop: 24,
+    marginBottom: 16,
+    paddingTop: 24,
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+  },
+  wikipediaExtract: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: "#374151",
+    marginBottom: 12,
+  },
+  wikipediaLink: {
+    marginTop: 8,
+  },
+  wikipediaLinkText: {
+    fontSize: 15,
+    color: "#3B82F6",
+    fontWeight: "600",
+  },
+  loadingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: "#6B7280",
   },
 });
 

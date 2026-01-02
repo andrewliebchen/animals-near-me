@@ -1,5 +1,6 @@
 import type { ViewportParams } from "../utils/viewport";
 import type { Observation } from "../types/observation";
+import type { WikipediaSummary } from "../types/wikipedia";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
@@ -39,6 +40,43 @@ export async function fetchObservations(
   } catch (error) {
     console.error("Error fetching observations:", error);
     throw error;
+  }
+}
+
+/**
+ * Fetch Wikipedia summary for an animal name
+ */
+export async function fetchWikipediaSummary(
+  title: string
+): Promise<WikipediaSummary | null> {
+  if (!title) {
+    return null;
+  }
+
+  const encodedTitle = encodeURIComponent(title);
+  const url = `${API_URL}/wikipedia?title=${encodedTitle}`;
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        // Article not found - return null
+        return null;
+      }
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data: WikipediaSummary = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Error fetching Wikipedia summary:", error);
+    return null;
   }
 }
 
