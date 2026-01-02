@@ -30,18 +30,68 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
   const theme = useTheme();
   const snapPoints = useMemo(() => ["40%", "90%"], []);
   const sheetRef = React.useRef<BottomSheet>(null);
+  const [isSheetReady, setIsSheetReady] = useState(false);
   
   const [wikipediaData, setWikipediaData] = useState<WikipediaSummary | null>(null);
   const [wikipediaLoading, setWikipediaLoading] = useState(false);
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [displayedObservationId, setDisplayedObservationId] = useState<string | null>(null);
 
+  // Callback ref to know when BottomSheet is mounted
+  const setSheetRef = React.useCallback((ref: BottomSheet | null) => {
+    sheetRef.current = ref;
+    setIsSheetReady(!!ref);
+  }, []);
+
+  // Effect to open/close sheet when observation changes
   React.useEffect(() => {
     if (observation) {
-      sheetRef.current?.snapToIndex(0);
+      const openSheet = () => {
+        if (sheetRef.current) {
+          sheetRef.current.snapToIndex(0);
+        }
+      };
+      
+      // If sheet is ready, open it with a small delay to ensure it's fully mounted
+      if (isSheetReady && sheetRef.current) {
+        setTimeout(openSheet, 100);
+      }
     } else {
-      sheetRef.current?.close();
+      if (sheetRef.current) {
+        sheetRef.current.close();
+      }
     }
-  }, [observation]);
+  }, [observation, isSheetReady]);
+
+  // Effect to open sheet when it becomes ready (if we have an observation waiting)
+  React.useEffect(() => {
+    if (isSheetReady && observation && sheetRef.current) {
+      setTimeout(() => {
+        if (sheetRef.current) {
+          sheetRef.current.snapToIndex(0);
+        }
+      }, 100);
+    }
+  }, [isSheetReady, observation]);
+
+  // Track observation changes and show loading state during transitions
+  useEffect(() => {
+    if (observation) {
+      // If this is a different observation, show loading state
+      if (displayedObservationId !== observation.id) {
+        setIsTransitioning(true);
+        setDisplayedObservationId(observation.id);
+        // Clear transition state after a brief delay to allow content to render
+        setTimeout(() => {
+          setIsTransitioning(false);
+        }, 100);
+      }
+    } else {
+      setDisplayedObservationId(null);
+      setIsTransitioning(false);
+    }
+  }, [observation, displayedObservationId]);
 
   // Fetch Wikipedia data when observation changes
   useEffect(() => {
@@ -98,6 +148,7 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
 
     fetchWikipedia();
   }, [observation]);
+
 
   if (!observation) {
     return null;
@@ -169,23 +220,42 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
       ...styles.loadingText,
       color: theme.text.secondary,
     },
+    loadingOverlay: {
+      ...styles.loadingOverlay,
+      backgroundColor: theme.background.card,
+      opacity: 0.95,
+    },
   };
 
   return (
     <>
     <BottomSheet
-      ref={sheetRef}
+      ref={setSheetRef}
       index={-1}
       snapPoints={snapPoints}
       enablePanDownToClose
       onClose={onClose}
+      onChange={() => {}}
       enableDynamicSizing={false}
       handleIndicatorStyle={{ backgroundColor: theme.border, width: 80 }}
       backgroundStyle={{ backgroundColor: theme.background.card }}
     >
       <BottomSheetScrollView style={dynamicStyles.content}>
-        {/* Hero Image */}
-        {observation.photoUrl && (
+        {/* Loading overlay during transition */}
+        {isTransitioning && (
+          <View style={dynamicStyles.loadingOverlay}>
+            <ActivityIndicator size="large" color={theme.text.primary} />
+            <Text style={[styles.loadingOverlayText, { color: theme.text.secondary }]}>
+              Loading...
+            </Text>
+          </View>
+        )}
+
+        {/* Content - hide during transition to prevent showing old data */}
+        {!isTransitioning && (
+          <>
+            {/* Hero Image */}
+            {observation.photoUrl && (
           <TouchableOpacity
             style={dynamicStyles.imageContainer}
             onPress={() => setImageViewerVisible(true)}
@@ -279,6 +349,8 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
               </TouchableOpacity>
             )}
           </View>
+        )}
+          </>
         )}
       </BottomSheetScrollView>
     </BottomSheet>
@@ -395,6 +467,21 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 14,
+  },
+  loadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1000,
+    minHeight: 200,
+  },
+  loadingOverlayText: {
+    marginTop: 12,
+    fontSize: 16,
   },
 });
 

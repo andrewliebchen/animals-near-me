@@ -31,10 +31,14 @@ export const ObservationMarker: React.FC<ObservationMarkerProps> = ({
     longitude: observation.lng + (offset?.lng || 0),
   };
 
+  const handlePress = () => {
+    onPress(observation);
+  };
+
   return (
     <Marker
       coordinate={coordinate}
-      onPress={() => onPress(observation)}
+      onPress={handlePress}
       tracksViewChanges={false}
       anchor={{ x: 0.5, y: 0.5 }}
     >
