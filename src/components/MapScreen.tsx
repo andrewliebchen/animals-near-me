@@ -54,6 +54,7 @@ export const MapScreen: React.FC = () => {
   const [showLegend, setShowLegend] = useState(false);
   const [showFilterSheet, setShowFilterSheet] = useState(false);
   const isZoomingIntoClusterRef = useRef(false);
+  const lastCenteredObservationIdRef = useRef<string | null>(null);
 
   // Filter observations to those within a reasonable distance of current viewport
   // This keeps cluster counts accurate while preventing memory issues
@@ -181,6 +182,45 @@ export const MapScreen: React.FC = () => {
       fetchObservationsForViewport(DEFAULT_REGION);
     }
   }, []);
+
+  // Center map on selected observation only once when it's first selected
+  useEffect(() => {
+    if (selectedObservation && mapRef.current && viewport) {
+      // Only center if this is a new observation (not the one we already centered on)
+      if (lastCenteredObservationIdRef.current !== selectedObservation.id) {
+        // Set flag to prevent refetching when centering on observation
+        isZoomingIntoClusterRef.current = true;
+
+        // Adjust center point to position marker higher on screen (accounting for bottom sheet)
+        // Move center slightly south (lower latitude) so marker appears in upper portion of visible area
+        const verticalOffset = viewport.latitudeDelta * 0.15; // 15% of viewport height upward
+        const adjustedLatitude = selectedObservation.lat - verticalOffset;
+
+        // Animate to the adjusted coordinate, keeping current zoom level
+        // This ensures the marker is visible and positioned higher to avoid bottom sheet
+        mapRef.current.animateToRegion(
+          {
+            latitude: adjustedLatitude,
+            longitude: selectedObservation.lng,
+            latitudeDelta: viewport.latitudeDelta,
+            longitudeDelta: viewport.longitudeDelta,
+          },
+          300
+        );
+
+        // Track that we've centered on this observation
+        lastCenteredObservationIdRef.current = selectedObservation.id;
+
+        // Reset the flag after animation completes
+        setTimeout(() => {
+          isZoomingIntoClusterRef.current = false;
+        }, 500);
+      }
+    } else if (!selectedObservation) {
+      // Clear the last centered ID when no observation is selected
+      lastCenteredObservationIdRef.current = null;
+    }
+  }, [selectedObservation, viewport]);
 
   const handleRetry = useCallback(() => {
     clearError();
@@ -335,6 +375,7 @@ export const MapScreen: React.FC = () => {
               longitude: item.observation.lng,
             }}
             offset={item.offset}
+            selected={selectedObservation?.id === item.observation.id}
           />
         ))}
       </ClusteredMapView>
