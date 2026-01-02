@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
+import ImageViewing from "react-native-image-viewing";
 import type { Observation } from "../types/observation";
 import type { WikipediaSummary } from "../types/wikipedia";
 import { getTaxaColor } from "../utils/colors";
@@ -30,6 +31,7 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
   
   const [wikipediaData, setWikipediaData] = useState<WikipediaSummary | null>(null);
   const [wikipediaLoading, setWikipediaLoading] = useState(false);
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
 
   React.useEffect(() => {
     if (observation) {
@@ -125,6 +127,7 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
   };
 
   return (
+    <>
     <BottomSheet
       ref={sheetRef}
       index={-1}
@@ -137,13 +140,17 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
       <BottomSheetScrollView style={styles.content}>
         {/* Hero Image */}
         {observation.photoUrl && (
-          <View style={styles.imageContainer}>
+          <TouchableOpacity
+            style={styles.imageContainer}
+            onPress={() => setImageViewerVisible(true)}
+            activeOpacity={0.9}
+          >
             <Image
               source={{ uri: observation.photoUrl }}
               style={styles.heroImage}
               resizeMode="cover"
             />
-          </View>
+          </TouchableOpacity>
         )}
 
         {/* Names and Provider Badge */}
@@ -229,6 +236,16 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
         )}
       </BottomSheetScrollView>
     </BottomSheet>
+
+    {observation.photoUrl && (
+      <ImageViewing
+        images={[{ uri: observation.photoUrl }]}
+        imageIndex={0}
+        visible={imageViewerVisible}
+        onRequestClose={() => setImageViewerVisible(false)}
+      />
+    )}
+    </>
   );
 };
 

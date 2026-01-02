@@ -162,13 +162,6 @@ Fetches observations for a given viewport.
 
 ## Deployment
 
-### Client (Expo)
-
-Build for TestFlight:
-```bash
-eas build --platform ios
-```
-
 ### Server (Vercel)
 
 Deploy:
@@ -177,6 +170,62 @@ vercel --prod
 ```
 
 Make sure to set the `EBIRD_API_KEY` environment variable in Vercel dashboard.
+
+### Client (Expo) - TestFlight Build
+
+#### Prerequisites
+
+1. **EAS CLI**: Install globally if not already installed:
+   ```bash
+   npm install -g eas-cli
+   ```
+
+2. **Login to Expo**: 
+   ```bash
+   eas login
+   ```
+
+3. **Configure Production API URL**: Update `eas.json` with your Vercel deployment URL. In the `preview` and `production` build profiles, update the `EXPO_PUBLIC_API_URL` environment variable:
+   ```json
+   "env": {
+     "EXPO_PUBLIC_API_URL": "https://your-app.vercel.app/api"
+   }
+   ```
+   Replace `https://your-app.vercel.app` with your actual Vercel deployment URL.
+
+   **Note**: For local development, create a `.env` file with `EXPO_PUBLIC_API_URL=http://localhost:3000/api`
+
+#### Building for TestFlight
+
+Use the preview profile to build for TestFlight:
+```bash
+npm run eas:build:ios:preview
+```
+
+Or use EAS CLI directly:
+```bash
+eas build --platform ios --profile preview
+```
+
+#### Submitting to TestFlight
+
+After the build completes, you can submit it to App Store Connect:
+```bash
+npm run eas:submit:ios
+```
+
+Or use EAS CLI directly:
+```bash
+eas submit --platform ios
+```
+
+**Note**: Make sure you've configured your Apple ID and App Store Connect credentials in `eas.json` before submitting, or EAS will prompt you during submission.
+
+#### Build Profiles
+
+- `development`: For development client builds (simulator)
+- `preview`: For TestFlight builds (internal distribution)
+- `production`: For App Store releases (store distribution)
 
 ## License
 

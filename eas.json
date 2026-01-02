@@ -1,0 +1,42 @@
+{
+  "cli": {
+    "version": ">= 5.0.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": {
+        "simulator": true
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "ios": {
+        "simulator": false
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://animals-near-me-orpin.vercel.app/api"
+      }
+    },
+    "production": {
+      "distribution": "store",
+      "ios": {
+        "simulator": false
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://animals-near-me-orpin.vercel.app/api"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "andrewliebchen@gmail.com",
+        "ascAppId": "6757284590",
+        "appleTeamId": "89KSYS23ZR"
+      }
+    }
+  }
+}
+
