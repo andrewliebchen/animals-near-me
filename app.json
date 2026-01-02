@@ -17,14 +17,21 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.animalsnearme.app",
-      "buildNumber": "1"
+      "buildNumber": "3",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "scheme": "animals-near-me",
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -36,7 +43,11 @@
           "locationAlwaysAndWhenInUsePermission": "Allow Animals Near Me to use your location to show nearby wildlife observations."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "7912a1ff-9808-4679-b621-e18a4846ee5e"
+      }
+    }
   }
 }
-

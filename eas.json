@@ -13,7 +13,8 @@
     "preview": {
       "distribution": "internal",
       "ios": {
-        "simulator": false
+        "simulator": false,
+        "image": "macos-sequoia-15.3-xcode-16.2"
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://animals-near-me-orpin.vercel.app/api"
@@ -22,7 +23,8 @@
     "production": {
       "distribution": "store",
       "ios": {
-        "simulator": false
+        "simulator": false,
+        "image": "macos-sequoia-15.3-xcode-16.2"
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://animals-near-me-orpin.vercel.app/api"
