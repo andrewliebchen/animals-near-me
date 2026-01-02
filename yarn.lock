@@ -1670,6 +1670,13 @@
     "@jridgewell/resolve-uri" "^3.0.3"
     "@jridgewell/sourcemap-codec" "^1.4.10"
 
+"@mapbox/geo-viewport@^0.4.1":
+  version "0.4.1"
+  resolved "https://registry.npmjs.org/@mapbox/geo-viewport/-/geo-viewport-0.4.1.tgz"
+  integrity sha512-5g6eM3EOSl7+0p0VY+vHWEYjUlNzof936VKHTi/NuJVABjbYe8D2NAVJ0qt5C9Np4glUlhKFepgAgQ0OEybrjQ==
+  dependencies:
+    "@mapbox/sphericalmercator" "~1.1.0"
+
 "@mapbox/node-pre-gyp@^1.0.5":
   version "1.0.11"
   resolved "https://registry.npmjs.org/@mapbox/node-pre-gyp/-/node-pre-gyp-1.0.11.tgz"
@@ -1684,6 +1691,11 @@
     rimraf "^3.0.2"
     semver "^7.3.5"
     tar "^6.1.11"
+
+"@mapbox/sphericalmercator@~1.1.0":
+  version "1.1.0"
+  resolved "https://registry.npmjs.org/@mapbox/sphericalmercator/-/sphericalmercator-1.1.0.tgz"
+  integrity sha512-pEsfZyG4OMThlfFQbCte4gegvHUjxXCjz0KZ4Xk8NdOYTQBLflj6U8PL05RPAiuRAMAQNUUKJuL6qYZ5Y4kAWA==
 
 "@nodelib/fs.scandir@2.1.5":
   version "2.1.5"
@@ -5316,6 +5328,11 @@ jsonfile@^6.0.1:
   optionalDependencies:
     graceful-fs "^4.1.6"
 
+kdbush@^4.0.2:
+  version "4.0.2"
+  resolved "https://registry.npmjs.org/kdbush/-/kdbush-4.0.2.tgz"
+  integrity sha512-WbCVYJ27Sz8zi9Q7Q0xHC+05iwkm3Znipc2XTlrnJbsHMYktW4hPhXUE8Ys1engBrvffoSCqbil1JQAa7clRpA==
+
 kind-of@^6.0.2:
   version "6.0.3"
   resolved "https://registry.npmjs.org/kind-of/-/kind-of-6.0.3.tgz"
@@ -6623,7 +6640,15 @@ react-native-image-viewing@^0.2.2:
   resolved "https://registry.npmjs.org/react-native-image-viewing/-/react-native-image-viewing-0.2.2.tgz"
   integrity sha512-osWieG+p/d2NPbAyonOMubttajtYEYiRGQaJA54slFxZ69j1V4/dCmcrVQry47ktVKy8/qpFwCpW1eT6MH5T2Q==
 
-react-native-maps@1.14.0:
+react-native-map-clustering@^4.0.0:
+  version "4.0.0"
+  resolved "https://registry.npmjs.org/react-native-map-clustering/-/react-native-map-clustering-4.0.0.tgz"
+  integrity sha512-+YNh4frhZIHQReURxYGHNy9MJ50GYWpW6psoBEjvTG6vb33eYu00GmO8Pu/9VwMB1YL5lOxZ9+sJClJ8Mz1Bxw==
+  dependencies:
+    "@mapbox/geo-viewport" "^0.4.1"
+    supercluster "^8.0.0"
+
+react-native-maps@*, react-native-maps@1.14.0:
   version "1.14.0"
   resolved "https://registry.npmjs.org/react-native-maps/-/react-native-maps-1.14.0.tgz"
   integrity sha512-ai7h4UdRLGPFCguz1fI8n4sKLEh35nZXHAH4nSWyAeHGrN8K9GjICu9Xd4Q5Ok4h+WwrM6Xz5pGbF3Qm1tO6iQ==
@@ -7521,6 +7546,13 @@ sudo-prompt@^9.0.0:
   version "9.2.1"
   resolved "https://registry.npmjs.org/sudo-prompt/-/sudo-prompt-9.2.1.tgz"
   integrity sha512-Mu7R0g4ig9TUuGSxJavny5Rv0egCEtpZRNMrZaYS1vxkiIxGiGUwoezU3LazIQ+KE04hTrTfNPgxU5gzi7F5Pw==
+
+supercluster@^8.0.0:
+  version "8.0.1"
+  resolved "https://registry.npmjs.org/supercluster/-/supercluster-8.0.1.tgz"
+  integrity sha512-IiOea5kJ9iqzD2t7QJq/cREyLHTtSmUT6gQsweojg9WH2sYJqZK9SswTu6jrscO6D1G5v5vYZ9ru/eq85lXeZQ==
+  dependencies:
+    kdbush "^4.0.2"
 
 supports-color@^5.3.0:
   version "5.5.0"

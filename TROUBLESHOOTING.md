@@ -52,3 +52,4 @@ If you're seeing module resolution errors after installing new packages:
 - Try: `npx expo run:ios` to rebuild native code
 
 
+
