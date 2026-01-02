@@ -7,11 +7,12 @@ import {
   Switch,
   ScrollView,
 } from "react-native";
-import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
+import BottomSheet, { BottomSheetScrollView, BottomSheetView } from "@gorhom/bottom-sheet";
 import type { FilterParams, RecencyFilter } from "../types/filters";
 import type { TaxaBucket, Provider } from "../types/observation";
 import { TAXA_COLORS } from "../utils/colors";
 import { DEFAULT_FILTERS, countActiveFilters } from "../types/filters";
+import { useTheme } from "../utils/theme";
 
 interface FilterSheetProps {
   visible: boolean;
@@ -21,7 +22,6 @@ interface FilterSheetProps {
 }
 
 const RECENCY_OPTIONS: Array<{ value: RecencyFilter; label: string }> = [
-  { value: null, label: "All Time" },
   { value: "today", label: "Today" },
   { value: "this_week", label: "This Week" },
   { value: "this_month", label: "This Month" },
@@ -52,7 +52,8 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
   onFiltersChange,
   onClose,
 }) => {
-  const snapPoints = useMemo(() => ["70%", "90%"], []);
+  const theme = useTheme();
+  const snapPoints = useMemo(() => ["80%"], []);
   const sheetRef = React.useRef<BottomSheet>(null);
   const [localFilters, setLocalFilters] = useState<FilterParams>(filters);
 
@@ -86,11 +87,11 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
     setLocalFilters({ ...localFilters, taxa: newTaxa });
   };
 
-  const handleProviderToggle = (provider: Provider) => {
+  const handleProviderToggle = (provider: Provider, enabled: boolean) => {
     const currentProvider = localFilters.provider;
-    const newProvider = currentProvider.includes(provider)
-      ? currentProvider.filter((p) => p !== provider)
-      : [...currentProvider, provider];
+    const newProvider = enabled
+      ? [...currentProvider.filter((p) => p !== provider), provider]
+      : currentProvider.filter((p) => p !== provider);
     setLocalFilters({ ...localFilters, provider: newProvider });
   };
 
@@ -108,6 +109,91 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
   const hasChanges = JSON.stringify(localFilters) !== JSON.stringify(filters);
   const activeCount = countActiveFilters(localFilters);
 
+  const dynamicStyles = {
+    title: {
+      ...styles.title,
+      color: theme.text.primary,
+    },
+    sectionTitle: {
+      ...styles.sectionTitle,
+      color: theme.text.primary,
+    },
+    switchLabel: {
+      ...styles.switchLabel,
+      color: theme.text.primary,
+    },
+    recencyButton: {
+      ...styles.recencyButton,
+      backgroundColor: theme.background.button,
+      borderColor: theme.border,
+    },
+    recencyButtonText: {
+      ...styles.recencyButtonText,
+      color: theme.text.secondary,
+    },
+    taxaChip: {
+      ...styles.taxaChip,
+      backgroundColor: theme.background.card,
+    },
+    taxaChipText: {
+      ...styles.taxaChipText,
+    },
+    clearFilterText: {
+      ...styles.clearFilterText,
+      color: "#3B82F6", // Keep blue for links
+    },
+    actionContainer: {
+      ...styles.actionContainer,
+      backgroundColor: theme.background.card,
+      borderTopColor: theme.border,
+    },
+    clearButton: {
+      ...styles.clearButton,
+      backgroundColor: theme.background.button,
+    },
+    clearButtonText: {
+      ...styles.clearButtonText,
+      color: theme.text.secondary,
+    },
+    applyButtonDisabled: {
+      ...styles.applyButtonDisabled,
+      backgroundColor: theme.background.button,
+    },
+    applyButtonTextDisabled: {
+      ...styles.applyButtonTextDisabled,
+      color: theme.text.muted,
+    },
+  };
+
+  const footerComponent = () => (
+    <BottomSheetView style={dynamicStyles.actionContainer}>
+      <TouchableOpacity
+        style={[styles.button, dynamicStyles.clearButton]}
+        onPress={handleClear}
+      >
+        <Text style={dynamicStyles.clearButtonText}>Clear All</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[
+          styles.button,
+          styles.applyButton,
+          !hasChanges && dynamicStyles.applyButtonDisabled,
+        ]}
+        onPress={handleApply}
+        disabled={!hasChanges}
+      >
+        <Text
+          style={[
+            styles.applyButtonText,
+            !hasChanges && dynamicStyles.applyButtonTextDisabled,
+          ]}
+        >
+          Apply {activeCount > 0 && `(${activeCount})`}
+        </Text>
+      </TouchableOpacity>
+    </BottomSheetView>
+  );
+
   return (
     <BottomSheet
       ref={sheetRef}
@@ -116,197 +202,138 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
       enablePanDownToClose
       onClose={onClose}
       enableDynamicSizing={false}
-      handleIndicatorStyle={{ backgroundColor: "#DDD", width: 80 }}
+      handleIndicatorStyle={{ backgroundColor: theme.border, width: 80 }}
+      backgroundStyle={{ backgroundColor: theme.background.card }}
+      footerComponent={footerComponent}
+      enableOverDrag={false}
     >
-      <BottomSheetScrollView style={styles.content}>
-        <Text style={styles.title}>Filter Observations</Text>
+      <View style={styles.container}>
+        <BottomSheetScrollView 
+          style={styles.scrollContent}
+          contentContainerStyle={styles.scrollContentContainer}
+        >
+          <Text style={dynamicStyles.title}>Filter Observations</Text>
 
-        {/* Recency Filter */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recency</Text>
-          <View style={styles.recencyContainer}>
-            {RECENCY_OPTIONS.map((option) => (
-              <TouchableOpacity
-                key={option.value || "all"}
-                style={[
-                  styles.recencyButton,
-                  localFilters.recency === option.value && styles.recencyButtonActive,
-                ]}
-                onPress={() => handleRecencyChange(option.value)}
-              >
-                <Text
-                  style={[
-                    styles.recencyButtonText,
-                    localFilters.recency === option.value && styles.recencyButtonTextActive,
-                  ]}
-                >
-                  {option.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Photo Filter */}
-        <View style={styles.section}>
-          <View style={styles.switchRow}>
-            <Text style={styles.sectionTitle}>Has Photo</Text>
-            <View style={styles.switchContainer}>
-              <Text style={styles.switchLabel}>
-                {localFilters.hasPhoto === null
-                  ? "All"
-                  : localFilters.hasPhoto
-                  ? "Has Photo"
-                  : "No Photo"}
-              </Text>
-              <Switch
-                value={localFilters.hasPhoto === true}
-                onValueChange={(value) => {
-                  if (value) {
-                    handleHasPhotoChange(true);
-                  } else {
-                    // Toggle between false and null
-                    handleHasPhotoChange(
-                      localFilters.hasPhoto === true ? null : false
-                    );
-                  }
-                }}
-                trackColor={{ false: "#E5E7EB", true: "#3B82F6" }}
-                thumbColor="#FFFFFF"
-              />
-            </View>
-          </View>
-          {localFilters.hasPhoto !== null && (
-            <TouchableOpacity
-              style={styles.clearFilterButton}
-              onPress={() => handleHasPhotoChange(null)}
-            >
-              <Text style={styles.clearFilterText}>Show All</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Taxa Filter */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Categories</Text>
-          <View style={styles.taxaGrid}>
-            {TAXA_OPTIONS.map((taxa) => {
-              const isSelected = localFilters.taxa.includes(taxa);
-              const color = TAXA_COLORS[taxa];
-              return (
-                <TouchableOpacity
-                  key={taxa}
-                  style={[
-                    styles.taxaChip,
-                    { borderColor: color },
-                    isSelected && { backgroundColor: color + "20" },
-                  ]}
-                  onPress={() => handleTaxaToggle(taxa)}
-                >
-                  <Text
-                    style={[
-                      styles.taxaChipText,
-                      { color: isSelected ? color : "#6B7280" },
-                    ]}
-                  >
-                    {taxa}
-                  </Text>
-                  {isSelected && (
-                    <View style={[styles.checkmark, { backgroundColor: color }]}>
-                      <Text style={styles.checkmarkText}>✓</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-          {localFilters.taxa.length > 0 && (
-            <TouchableOpacity
-              style={styles.clearFilterButton}
-              onPress={() => setLocalFilters({ ...localFilters, taxa: [] })}
-            >
-              <Text style={styles.clearFilterText}>Clear Selection</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Provider Filter */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Data Source</Text>
-          <View style={styles.providerContainer}>
-            {PROVIDER_OPTIONS.map((option) => {
-              const isSelected = localFilters.provider.includes(option.value);
-              return (
+          {/* Recency Filter */}
+          <View style={styles.section}>
+            <Text style={dynamicStyles.sectionTitle}>Recency</Text>
+            <View style={styles.recencyContainer}>
+              {RECENCY_OPTIONS.map((option) => (
                 <TouchableOpacity
                   key={option.value}
                   style={[
-                    styles.providerButton,
-                    isSelected && styles.providerButtonActive,
+                    dynamicStyles.recencyButton,
+                    localFilters.recency === option.value && styles.recencyButtonActive,
                   ]}
-                  onPress={() => handleProviderToggle(option.value)}
+                  onPress={() => handleRecencyChange(option.value)}
                 >
                   <Text
                     style={[
-                      styles.providerButtonText,
-                      isSelected && styles.providerButtonTextActive,
+                      dynamicStyles.recencyButtonText,
+                      localFilters.recency === option.value && styles.recencyButtonTextActive,
                     ]}
                   >
                     {option.label}
                   </Text>
-                  {isSelected && (
-                    <Text style={styles.checkmarkText}>✓</Text>
-                  )}
                 </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* Photo Filter */}
+          <View style={styles.section}>
+            <View style={styles.switchRow}>
+              <Text style={dynamicStyles.switchLabel}>Has Photo</Text>
+              <Switch
+                value={localFilters.hasPhoto === true}
+                onValueChange={(value) => {
+                  handleHasPhotoChange(value ? true : null);
+                }}
+                trackColor={{ false: theme.border, true: "#3B82F6" }}
+                thumbColor="#FFFFFF"
+              />
+            </View>
+          </View>
+
+          {/* Taxa Filter */}
+          <View style={styles.section}>
+            <Text style={dynamicStyles.sectionTitle}>Categories</Text>
+            <View style={styles.taxaGrid}>
+              {TAXA_OPTIONS.map((taxa) => {
+                const isSelected = localFilters.taxa.includes(taxa);
+                const color = TAXA_COLORS[taxa];
+                return (
+                  <TouchableOpacity
+                    key={taxa}
+                    style={[
+                      dynamicStyles.taxaChip,
+                      { borderColor: color },
+                      isSelected && { backgroundColor: color + "20" },
+                    ]}
+                    onPress={() => handleTaxaToggle(taxa)}
+                  >
+                    <Text
+                      style={[
+                        dynamicStyles.taxaChipText,
+                        { color: isSelected ? color : theme.text.secondary },
+                      ]}
+                    >
+                      {taxa}
+                    </Text>
+                    {isSelected && (
+                      <View style={[styles.checkmark, { backgroundColor: color }]}>
+                        <Text style={styles.checkmarkText}>✓</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            {localFilters.taxa.length > 0 && (
+              <TouchableOpacity
+                style={styles.clearFilterButton}
+                onPress={() => setLocalFilters({ ...localFilters, taxa: [] })}
+              >
+                <Text style={dynamicStyles.clearFilterText}>Clear Selection</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Provider Filter */}
+          <View style={styles.section}>
+            <Text style={dynamicStyles.sectionTitle}>Data Source</Text>
+            {PROVIDER_OPTIONS.map((option) => {
+              const isSelected = localFilters.provider.includes(option.value);
+              return (
+                <View key={option.value} style={styles.switchRow}>
+                  <Text style={dynamicStyles.switchLabel}>{option.label}</Text>
+                  <Switch
+                    value={isSelected}
+                    onValueChange={(value) => handleProviderToggle(option.value, value)}
+                    trackColor={{ false: theme.border, true: "#3B82F6" }}
+                    thumbColor="#FFFFFF"
+                  />
+                </View>
               );
             })}
           </View>
-          {localFilters.provider.length > 0 && (
-            <TouchableOpacity
-              style={styles.clearFilterButton}
-              onPress={() => setLocalFilters({ ...localFilters, provider: [] })}
-            >
-              <Text style={styles.clearFilterText}>Clear Selection</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Action Buttons */}
-        <View style={styles.actionContainer}>
-          <TouchableOpacity
-            style={[styles.button, styles.clearButton]}
-            onPress={handleClear}
-          >
-            <Text style={styles.clearButtonText}>Clear All</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.button,
-              styles.applyButton,
-              !hasChanges && styles.applyButtonDisabled,
-            ]}
-            onPress={handleApply}
-            disabled={!hasChanges}
-          >
-            <Text
-              style={[
-                styles.applyButtonText,
-                !hasChanges && styles.applyButtonTextDisabled,
-              ]}
-            >
-              Apply {activeCount > 0 && `(${activeCount})`}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </BottomSheetScrollView>
+        </BottomSheetScrollView>
+      </View>
     </BottomSheet>
   );
 };
 
 const styles = StyleSheet.create({
-  content: {
+  container: {
     flex: 1,
+    flexDirection: "column",
+  },
+  scrollContent: {
+    flex: 1,
+  },
+  scrollContentContainer: {
     paddingHorizontal: 16,
-    paddingBottom: 32,
+    paddingBottom: 16,
   },
   title: {
     fontSize: 24,
@@ -353,16 +380,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-  },
-  switchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
+    marginBottom: 12,
   },
   switchLabel: {
-    fontSize: 14,
-    color: "#6B7280",
-    marginRight: 8,
+    fontSize: 16,
+    color: "#111827",
   },
   taxaGrid: {
     flexDirection: "row",
@@ -395,34 +417,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "bold",
   },
-  providerContainer: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  providerButton: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: "#F3F4F6",
-    borderWidth: 2,
-    borderColor: "#E5E7EB",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  providerButtonActive: {
-    backgroundColor: "#3B82F6",
-    borderColor: "#3B82F6",
-  },
-  providerButtonText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#6B7280",
-  },
-  providerButtonTextActive: {
-    color: "#FFFFFF",
-  },
   clearFilterButton: {
     marginTop: 8,
     alignSelf: "flex-start",
@@ -435,8 +429,12 @@ const styles = StyleSheet.create({
   actionContainer: {
     flexDirection: "row",
     gap: 12,
-    marginTop: 8,
-    marginBottom: 32,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 40, // Extra padding for home bar
+    backgroundColor: "#FFFFFF",
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
   },
   button: {
     flex: 1,

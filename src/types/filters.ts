@@ -10,10 +10,10 @@ export interface FilterParams {
 }
 
 export const DEFAULT_FILTERS: FilterParams = {
-  recency: null,
+  recency: "this_week",
   hasPhoto: null,
   taxa: [],
-  provider: [],
+  provider: ["ebird", "inat"], // Both providers selected by default
 };
 
 /**
@@ -21,10 +21,12 @@ export const DEFAULT_FILTERS: FilterParams = {
  */
 export function countActiveFilters(filters: FilterParams): number {
   let count = 0;
-  if (filters.recency !== null) count++;
+  // Don't count default recency value
+  if (filters.recency !== null && filters.recency !== "this_week") count++;
   if (filters.hasPhoto !== null) count++;
   if (filters.taxa.length > 0) count++;
-  if (filters.provider.length > 0) count++;
+  // Don't count providers when both are selected (default)
+  if (filters.provider.length > 0 && filters.provider.length < 2) count++;
   return count;
 }
 

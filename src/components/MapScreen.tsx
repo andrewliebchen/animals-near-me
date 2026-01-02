@@ -10,6 +10,7 @@ import { ErrorState } from "./ErrorState";
 import { ColorLegend } from "./ColorLegend";
 import { FilterSheet } from "./FilterSheet";
 import { countActiveFilters } from "../types/filters";
+import { useTheme } from "../utils/theme";
 
 // Debounce utility
 function useDebounce<T extends (...args: any[]) => void>(
@@ -32,6 +33,7 @@ function useDebounce<T extends (...args: any[]) => void>(
 }
 
 export const MapScreen: React.FC = () => {
+  const theme = useTheme();
   const {
     observations,
     selectedObservation,
@@ -106,11 +108,22 @@ export const MapScreen: React.FC = () => {
 
       {/* Filter Button */}
       <TouchableOpacity
-        style={styles.filterButton}
+        style={[
+          styles.filterButton,
+          {
+            backgroundColor: theme.background.card,
+            shadowColor: theme.shadow.color,
+            shadowOpacity: theme.shadow.opacity,
+          },
+        ]}
         onPress={() => setShowFilterSheet(true)}
         activeOpacity={0.8}
       >
-        <Text style={styles.filterButtonText}>Filter</Text>
+        <Text
+          style={[styles.filterButtonText, { color: theme.text.primary }]}
+        >
+          Filter
+        </Text>
         {countActiveFilters(filters) > 0 && (
           <View style={styles.filterBadge}>
             <Text style={styles.filterBadgeText}>
@@ -146,23 +159,19 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 50,
     right: 16,
-    backgroundColor: "#FFFFFF",
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 24,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
   filterButtonText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#111827",
   },
   filterBadge: {
     backgroundColor: "#3B82F6",
