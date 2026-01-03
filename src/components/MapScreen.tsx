@@ -3,8 +3,10 @@ import { View, StyleSheet, TouchableOpacity, Text } from "react-native";
 import { Region, Marker } from "react-native-maps";
 import ClusteredMapView from "react-native-map-clustering";
 import * as Location from "expo-location";
+import * as Linking from "expo-linking";
 import { Ionicons } from "@expo/vector-icons";
 import { useObservationStore } from "../store/observationStore";
+import { fetchObservationById } from "../api/client";
 import { ObservationMarker } from "./ObservationMarker";
 import { ClusterMarker } from "./ClusterMarker";
 import { DEFAULT_REGION } from "../utils/viewport";
@@ -249,6 +251,65 @@ export const MapScreen: React.FC = () => {
       fetchObservationsForViewport(DEFAULT_REGION);
     }
   }, []);
+
+  const handleDeepLink = useCallback(async (url: string) => {
+    try {
+      // Parse URL: animals-near-me://observation/{id}
+      const parsed = Linking.parse(url);
+      
+      // Handle path like "observation/{id}" or "observation" with id in query params
+      let observationId: string | null = null;
+      
+      if (parsed.path) {
+        const pathParts = parsed.path.split("/");
+        if (pathParts[0] === "observation" && pathParts[1]) {
+          observationId = pathParts[1];
+        } else if (parsed.queryParams?.id) {
+          observationId = parsed.queryParams.id as string;
+        }
+      }
+      
+      if (observationId) {
+        const observation = await fetchObservationById(observationId);
+        if (observation) {
+          setSelectedObservation(observation);
+          // Center map on observation location
+          if (mapRef.current) {
+            mapRef.current.animateToRegion(
+              {
+                latitude: observation.lat,
+                longitude: observation.lng,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01,
+              },
+              500
+            );
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error handling deep link:", error);
+    }
+  }, [setSelectedObservation]);
+
+  // Handle deep links
+  useEffect(() => {
+    // Handle initial URL if app was opened via deep link
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        handleDeepLink(url);
+      }
+    });
+
+    // Listen for deep links while app is running
+    const subscription = Linking.addEventListener("url", (event) => {
+      handleDeepLink(event.url);
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [handleDeepLink]);
 
   // Center map on selected observation only once when it's first selected
   useEffect(() => {

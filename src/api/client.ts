@@ -9,6 +9,10 @@ export interface FetchObservationsResponse {
   observations: Observation[];
 }
 
+export interface FetchObservationResponse {
+  observation: Observation;
+}
+
 /**
  * Fetch observations from server based on viewport and filters
  */
@@ -94,6 +98,40 @@ export async function fetchWikipediaSummary(
     return data;
   } catch (error) {
     console.error("Error fetching Wikipedia summary:", error);
+    return null;
+  }
+}
+
+/**
+ * Fetch a single observation by ID
+ */
+export async function fetchObservationById(id: string): Promise<Observation | null> {
+  if (!id) {
+    return null;
+  }
+
+  const url = `${API_URL}/share/${id}?format=json`;
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null;
+      }
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data: FetchObservationResponse = await response.json();
+    return data.observation || null;
+  } catch (error) {
+    console.error("Error fetching observation by ID:", error);
     return null;
   }
 }

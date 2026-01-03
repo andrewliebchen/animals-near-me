@@ -8,13 +8,17 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  Share,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import ImageViewing from "react-native-image-viewing";
 import type { Observation } from "../types/observation";
 import type { WikipediaSummary } from "../types/wikipedia";
 import { getTaxaColor } from "../utils/colors";
 import { fetchWikipediaSummary } from "../api/client";
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 import { normalizeWikipediaTitle } from "../utils/wikipedia";
 import { useTheme } from "../utils/theme";
 
@@ -163,6 +167,18 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
     }
   };
 
+  const handleShare = async () => {
+    try {
+      const shareUrl = `${API_URL}/share/${observation.id}`;
+      await Share.share({
+        message: shareUrl,
+        url: shareUrl,
+      });
+    } catch (error) {
+      console.error("Error sharing:", error);
+    }
+  };
+
   const formatDate = (dateString?: string) => {
     if (!dateString) return "Unknown";
     try {
@@ -281,8 +297,17 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
               </Text>
             )}
           </View>
-          <View style={[styles.badge, { backgroundColor: color }]}>
-            <Text style={styles.badgeText}>{providerName}</Text>
+          <View style={styles.headerRight}>
+            <TouchableOpacity
+              style={styles.shareButton}
+              onPress={handleShare}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="share-outline" size={24} color={theme.text.primary} />
+            </TouchableOpacity>
+            <View style={[styles.badge, { backgroundColor: color }]}>
+              <Text style={styles.badgeText}>{providerName}</Text>
+            </View>
           </View>
         </View>
 
@@ -393,6 +418,14 @@ const styles = StyleSheet.create({
   nameSection: {
     flex: 1,
     marginRight: 12,
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  shareButton: {
+    padding: 4,
   },
   commonName: {
     fontSize: 24,

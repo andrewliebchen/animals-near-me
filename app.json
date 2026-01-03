@@ -23,11 +23,9 @@
       "bundleIdentifier": "com.animalsnearme.app",
       "buildNumber": "5",
       "icon": "./assets/icon.png",
-      "dark": {
-        "icon": "./icon-dark.png"
-      },
       "splash": {
         "image": "./assets/splash.png",
+        "resizeMode": "cover",
         "backgroundColor": "#ffffff",
         "dark": {
           "image": "./splash-dark.png",
@@ -50,6 +48,7 @@
       },
       "splash": {
         "image": "./assets/splash.png",
+        "resizeMode": "cover",
         "backgroundColor": "#ffffff",
         "dark": {
           "image": "./splash-dark.png",
@@ -59,6 +58,19 @@
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "animals-near-me",
+              "host": "*"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
       ]
     },
     "web": {
