@@ -226,7 +226,6 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
     },
     wikipediaSection: {
       ...styles.wikipediaSection,
-      borderTopColor: theme.border,
     },
     wikipediaExtract: {
       ...styles.wikipediaExtract,
@@ -285,7 +284,7 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
           </TouchableOpacity>
         )}
 
-        {/* Names and Provider Badge */}
+        {/* Names and Share Button */}
         <View style={styles.header}>
           <View style={styles.nameSection}>
             <Text style={dynamicStyles.commonName}>
@@ -297,27 +296,26 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
               </Text>
             )}
           </View>
-          <View style={styles.headerRight}>
-            <TouchableOpacity
-              style={styles.shareButton}
-              onPress={handleShare}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons name="share-outline" size={24} color={theme.text.primary} />
-            </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.shareButton}
+            onPress={handleShare}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="share-outline" size={24} color={theme.text.primary} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Taxa Bucket and Provider Badge */}
+        <View style={styles.section}>
+          <View style={styles.categoryRow}>
+            <View style={[styles.taxaChip, { borderColor: color }]}>
+              <Text style={[styles.taxaText, { color }]}>
+                {observation.taxaBucket}
+              </Text>
+            </View>
             <View style={[styles.badge, { backgroundColor: color }]}>
               <Text style={styles.badgeText}>{providerName}</Text>
             </View>
-          </View>
-        </View>
-
-        {/* Taxa Bucket */}
-        <View style={styles.section}>
-          <Text style={dynamicStyles.label}>Category</Text>
-          <View style={[styles.taxaChip, { borderColor: color }]}>
-            <Text style={[styles.taxaText, { color }]}>
-              {observation.taxaBucket}
-            </Text>
           </View>
         </View>
 
@@ -419,13 +417,13 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 12,
   },
-  headerRight: {
+  shareButton: {
+    padding: 4,
+  },
+  categoryRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-  },
-  shareButton: {
-    padding: 4,
   },
   commonName: {
     fontSize: 24,
@@ -440,6 +438,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
+    height: 32,
+    justifyContent: "center",
+    alignItems: "center",
   },
   badgeText: {
     color: "white",
@@ -465,6 +466,9 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 16,
     borderWidth: 2,
+    height: 32,
+    justifyContent: "center",
+    alignItems: "center",
   },
   taxaText: {
     fontSize: 14,
@@ -486,7 +490,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingTop: 24,
     paddingBottom: 60,
-    borderTopWidth: 1,
   },
   wikipediaExtract: {
     fontSize: 15,
