@@ -4,7 +4,7 @@ import type { TaxaBucket } from "../types/observation";
  * Color palette for taxa buckets
  */
 export const TAXA_COLORS: Record<TaxaBucket, string> = {
-  Bird: "#3B82F6", // Blue
+  Bird: "#2563EB", // Darker blue (distinct from location marker)
   Mammal: "#92400E", // Brown
   Reptile: "#10B981", // Green
   Amphibian: "#14B8A6", // Teal

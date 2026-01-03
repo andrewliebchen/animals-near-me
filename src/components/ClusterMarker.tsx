@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { Marker } from "react-native-maps";
+import { useTheme } from "../utils/theme";
 
 interface ClusterMarkerProps {
   coordinate: {
@@ -16,6 +17,8 @@ export const ClusterMarker: React.FC<ClusterMarkerProps> = ({
   count,
   onPress,
 }) => {
+  const theme = useTheme();
+  
   return (
     <Marker
       coordinate={coordinate}
@@ -27,12 +30,19 @@ export const ClusterMarker: React.FC<ClusterMarkerProps> = ({
         style={[
           styles.container,
           {
-            backgroundColor: "#3B82F6",
-            borderColor: "#FFFFFF",
+            backgroundColor: theme.background.card,
           },
         ]}
       >
-        <Text style={styles.count} numberOfLines={1}>
+        <Text
+          style={[
+            styles.count,
+            {
+              color: theme.text.primary,
+            },
+          ]}
+          numberOfLines={1}
+        >
           {count}
         </Text>
       </View>
@@ -42,10 +52,9 @@ export const ClusterMarker: React.FC<ClusterMarkerProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 2.5,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -55,9 +64,8 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   count: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "bold",
-    color: "#FFFFFF",
   },
 });
 

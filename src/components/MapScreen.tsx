@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { View, StyleSheet, TouchableOpacity, Text } from "react-native";
 import { Region, Marker } from "react-native-maps";
 import ClusteredMapView from "react-native-map-clustering";
+import * as Location from "expo-location";
+import { Ionicons } from "@expo/vector-icons";
 import { useObservationStore } from "../store/observationStore";
 import { ObservationMarker } from "./ObservationMarker";
 import { ClusterMarker } from "./ClusterMarker";
@@ -13,6 +15,47 @@ import { ColorLegend } from "./ColorLegend";
 import { FilterSheet } from "./FilterSheet";
 import { countActiveFilters } from "../types/filters";
 import { useTheme } from "../utils/theme";
+
+// Custom map style to hide businesses but keep landmarks and parks
+const CUSTOM_MAP_STYLE = [
+  {
+    featureType: "poi.business",
+    stylers: [{ visibility: "off" }],
+  },
+  {
+    featureType: "poi",
+    elementType: "labels",
+    stylers: [{ visibility: "off" }],
+  },
+  {
+    featureType: "poi.park",
+    stylers: [{ visibility: "on" }],
+  },
+  {
+    featureType: "poi.attraction",
+    stylers: [{ visibility: "on" }],
+  },
+  {
+    featureType: "poi.place_of_worship",
+    stylers: [{ visibility: "on" }],
+  },
+  {
+    featureType: "poi.government",
+    stylers: [{ visibility: "on" }],
+  },
+  {
+    featureType: "poi.medical",
+    stylers: [{ visibility: "off" }],
+  },
+  {
+    featureType: "poi.school",
+    stylers: [{ visibility: "off" }],
+  },
+  {
+    featureType: "poi.sports_complex",
+    stylers: [{ visibility: "off" }],
+  },
+];
 
 // Debounce utility
 function useDebounce<T extends (...args: any[]) => void>(
@@ -55,6 +98,7 @@ export const MapScreen: React.FC = () => {
   const [showFilterSheet, setShowFilterSheet] = useState(false);
   const isZoomingIntoClusterRef = useRef(false);
   const lastCenteredObservationIdRef = useRef<string | null>(null);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
   // Filter observations to those within a reasonable distance of current viewport
   // This keeps cluster counts accurate while preventing memory issues
@@ -176,6 +220,29 @@ export const MapScreen: React.FC = () => {
     [debouncedFetch, setViewport]
   );
 
+  // Get user location
+  useEffect(() => {
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          return;
+        }
+
+        // Get initial location
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        setUserLocation({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        });
+      } catch (error) {
+        console.error("Error getting user location:", error);
+      }
+    })();
+  }, []);
+
   // Initial fetch on mount
   useEffect(() => {
     if (!viewport) {
@@ -228,6 +295,50 @@ export const MapScreen: React.FC = () => {
       fetchObservationsForViewport(viewport);
     }
   }, [viewport, fetchObservationsForViewport, clearError]);
+
+  // Center map on user location
+  const handleCenterOnLocation = useCallback(async () => {
+    if (!mapRef.current) return;
+
+    try {
+      // Get current location
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      const coords = {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      };
+
+      setUserLocation(coords);
+
+      // Set flag to prevent refetching when centering on location
+      isZoomingIntoClusterRef.current = true;
+
+      // Animate to user location with a reasonable zoom level
+      mapRef.current.animateToRegion(
+        {
+          ...coords,
+          latitudeDelta: 0.01, // Approximately 1km view
+          longitudeDelta: 0.01,
+        },
+        500
+      );
+
+      // Reset the flag after animation completes
+      setTimeout(() => {
+        isZoomingIntoClusterRef.current = false;
+      }, 1000);
+    } catch (error) {
+      console.error("Error centering on location:", error);
+    }
+  }, []);
 
   // Handle cluster press - zoom into cluster to show all contained markers
   const handleClusterPress = useCallback(
@@ -353,7 +464,7 @@ export const MapScreen: React.FC = () => {
         showsMyLocationButton={true}
         onLongPress={() => setShowLegend(!showLegend)}
         clusteringEnabled={viewport ? viewport.latitudeDelta >= 0.03 : true}
-        clusterColor="#3B82F6"
+        clusterColor="#2563EB"
         clusterTextColor="#FFFFFF"
         radius={60}
         extent={512}
@@ -364,6 +475,8 @@ export const MapScreen: React.FC = () => {
         renderCluster={renderCluster}
         preserveClusterPressBehavior={true}
         spiralEnabled={false}
+        mapType="terrain"
+        customMapStyle={CUSTOM_MAP_STYLE}
       >
         {displayedObservations.map((item) => (
           <ObservationMarker
@@ -394,7 +507,7 @@ export const MapScreen: React.FC = () => {
             shadowOpacity: theme.shadow.opacity,
           },
         ]}
-        onPress={() => setShowFilterSheet(true)}
+        onPress={() => setShowFilterSheet(!showFilterSheet)}
         activeOpacity={0.8}
       >
         <Text
@@ -409,6 +522,26 @@ export const MapScreen: React.FC = () => {
             </Text>
           </View>
         )}
+      </TouchableOpacity>
+
+      {/* Location Button */}
+      <TouchableOpacity
+        style={[
+          styles.locationButton,
+          {
+            backgroundColor: theme.background.card,
+            shadowColor: theme.shadow.color,
+            shadowOpacity: theme.shadow.opacity,
+          },
+        ]}
+        onPress={handleCenterOnLocation}
+        activeOpacity={0.8}
+      >
+        <Ionicons
+          name="locate"
+          size={20}
+          color={theme.text.primary}
+        />
       </TouchableOpacity>
 
       <ObservationSheet
@@ -435,13 +568,14 @@ const styles = StyleSheet.create({
   },
   filterButton: {
     position: "absolute",
-    top: 50,
-    right: 16,
+    top: 70,
+    right: 68,
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 24,
+    height: 44,
+    borderRadius: 22,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: 8,
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 4,
@@ -464,6 +598,19 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 12,
     fontWeight: "600",
+  },
+  locationButton: {
+    position: "absolute",
+    top: 70,
+    right: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 3,
   },
 });
 
