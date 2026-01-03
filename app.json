@@ -9,7 +9,11 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "cover",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#ffffff",
+      "dark": {
+        "image": "./splash-dark.png",
+        "backgroundColor": "#000000"
+      }
     },
     "assetBundlePatterns": [
       "**/*"
@@ -18,6 +22,18 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.animalsnearme.app",
       "buildNumber": "4",
+      "icon": "./assets/icon.png",
+      "dark": {
+        "icon": "./icon-dark.png"
+      },
+      "splash": {
+        "image": "./assets/splash.png",
+        "backgroundColor": "#ffffff",
+        "dark": {
+          "image": "./splash-dark.png",
+          "backgroundColor": "#000000"
+        }
+      },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -26,7 +42,19 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#ffffff",
+        "dark": {
+          "foregroundImage": "./icon-dark.png",
+          "backgroundColor": "#000000"
+        }
+      },
+      "splash": {
+        "image": "./assets/splash.png",
+        "backgroundColor": "#ffffff",
+        "dark": {
+          "image": "./splash-dark.png",
+          "backgroundColor": "#000000"
+        }
       },
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
