@@ -61,6 +61,14 @@ export function bearing(
   lat2: number,
   lng2: number
 ): number {
+  // Validate inputs
+  if (
+    !isFinite(lat1) || !isFinite(lng1) || !isFinite(lat2) || !isFinite(lng2) ||
+    isNaN(lat1) || isNaN(lng1) || isNaN(lat2) || isNaN(lng2)
+  ) {
+    return 0; // Default to North if invalid
+  }
+
   const dLng = ((lng2 - lng1) * Math.PI) / 180;
   const lat1Rad = (lat1 * Math.PI) / 180;
   const lat2Rad = (lat2 * Math.PI) / 180;
@@ -74,7 +82,14 @@ export function bearing(
   const bearingDeg = (bearingRad * 180) / Math.PI;
   
   // Normalize to 0-360
-  return (bearingDeg + 360) % 360;
+  const normalized = (bearingDeg + 360) % 360;
+  
+  // Validate result
+  if (!isFinite(normalized) || isNaN(normalized)) {
+    return 0;
+  }
+  
+  return normalized;
 }
 
 

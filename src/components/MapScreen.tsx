@@ -111,6 +111,15 @@ export const MapScreen: React.FC = () => {
       resetFeedRadius();
     }
   }, [activeView, resetFeedRadius]);
+
+  // Close detail card when switching to feed view with animation
+  useEffect(() => {
+    if (activeView === "feed" && selectedObservation) {
+      // Close the observation sheet first to allow animation
+      // The ObservationSheet will handle the close animation when observation becomes null
+      setSelectedObservation(null);
+    }
+  }, [activeView, selectedObservation, setSelectedObservation]);
   const isZoomingIntoClusterRef = useRef(false);
   const lastCenteredObservationIdRef = useRef<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -538,32 +547,32 @@ export const MapScreen: React.FC = () => {
         showBackground={activeView === "feed"}
       />
 
-      {/* Map View */}
-      {activeView === "map" && (
-        <>
-          <ClusteredMapView
-            ref={mapRef}
-            style={styles.map}
-            initialRegion={DEFAULT_REGION}
-            onRegionChangeComplete={handleRegionChangeComplete}
-            showsUserLocation={true}
-            showsMyLocationButton={true}
-            onLongPress={() => setShowLegend(!showLegend)}
-            clusteringEnabled={viewport ? viewport.latitudeDelta >= 0.03 : true}
-            clusterColor="#2563EB"
-            clusterTextColor="#FFFFFF"
-            radius={60}
-            extent={512}
-            minZoom={0}
-            maxZoom={20}
-            minPoints={2}
-            onClusterPress={handleClusterPress}
-            renderCluster={renderCluster}
-            preserveClusterPressBehavior={true}
-            spiralEnabled={false}
-            mapType="terrain"
-            customMapStyle={CUSTOM_MAP_STYLE}
-          >
+      {/* Map View - Keep mounted to preserve state */}
+      <View style={activeView === "map" ? styles.mapContainer : styles.mapContainerHidden}>
+        <ClusteredMapView
+          ref={mapRef}
+          style={styles.map}
+          initialRegion={viewport || DEFAULT_REGION}
+          region={viewport || undefined}
+          onRegionChangeComplete={handleRegionChangeComplete}
+          showsUserLocation={true}
+          showsMyLocationButton={true}
+          onLongPress={() => setShowLegend(!showLegend)}
+          clusteringEnabled={viewport ? viewport.latitudeDelta >= 0.03 : true}
+          clusterColor="#2563EB"
+          clusterTextColor="#FFFFFF"
+          radius={60}
+          extent={512}
+          minZoom={0}
+          maxZoom={20}
+          minPoints={2}
+          onClusterPress={handleClusterPress}
+          renderCluster={renderCluster}
+          preserveClusterPressBehavior={true}
+          spiralEnabled={false}
+          mapType="terrain"
+          customMapStyle={CUSTOM_MAP_STYLE}
+        >
             {displayedObservations.map((item) => (
               <ObservationMarker
                 key={item.observation.id}
@@ -579,12 +588,14 @@ export const MapScreen: React.FC = () => {
             ))}
           </ClusteredMapView>
 
-          {isLoading && <LoadingState />}
-          {error && <ErrorState error={error} onRetry={handleRetry} />}
-          <ColorLegend visible={showLegend} />
+        {activeView === "map" && (
+          <>
+            {isLoading && <LoadingState />}
+            {error && <ErrorState error={error} onRetry={handleRetry} />}
+            <ColorLegend visible={showLegend} />
 
-          {/* Filter Button - Map View */}
-          <TouchableOpacity
+            {/* Filter Button - Map View */}
+            <TouchableOpacity
             style={[
               styles.filterButton,
               {
@@ -611,27 +622,28 @@ export const MapScreen: React.FC = () => {
             )}
           </TouchableOpacity>
 
-          {/* Location Button - Map View Only */}
-          <TouchableOpacity
-            style={[
-              styles.locationButton,
-              {
-                backgroundColor: theme.background.card,
-                shadowColor: theme.shadow.color,
-                shadowOpacity: theme.shadow.opacity,
-              },
-            ]}
-            onPress={handleCenterOnLocation}
-            activeOpacity={0.8}
-          >
-            <Ionicons
-              name="locate"
-              size={20}
-              color={theme.text.primary}
-            />
-          </TouchableOpacity>
-        </>
-      )}
+            {/* Location Button - Map View Only */}
+            <TouchableOpacity
+              style={[
+                styles.locationButton,
+                {
+                  backgroundColor: theme.background.card,
+                  shadowColor: theme.shadow.color,
+                  shadowOpacity: theme.shadow.opacity,
+                },
+              ]}
+              onPress={handleCenterOnLocation}
+              activeOpacity={0.8}
+            >
+              <Ionicons
+                name="locate"
+                size={20}
+                color={theme.text.primary}
+              />
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
 
       {/* Feed View */}
       {activeView === "feed" && (
@@ -707,6 +719,24 @@ export const MapScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  mapContainer: {
+    flex: 1,
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  mapContainerHidden: {
+    flex: 1,
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    opacity: 0,
+    pointerEvents: "none",
   },
   map: {
     flex: 1,

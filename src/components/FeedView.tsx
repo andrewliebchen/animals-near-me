@@ -84,13 +84,17 @@ function formatDistance(km: number): string {
  * Convert bearing in degrees to compass direction
  */
 function bearingToCompass(bearing: number): string {
+  if (isNaN(bearing) || !isFinite(bearing)) {
+    return "N";
+  }
   const directions = [
     "N", "NNE", "NE", "ENE",
     "E", "ESE", "SE", "SSE",
     "S", "SSW", "SW", "WSW",
     "W", "WNW", "NW", "NNW"
   ];
-  const index = Math.round(bearing / 22.5) % 16;
+  const normalizedBearing = ((bearing % 360) + 360) % 360; // Normalize to 0-360
+  const index = Math.round(normalizedBearing / 22.5) % 16;
   return directions[index];
 }
 
@@ -98,8 +102,12 @@ function bearingToCompass(bearing: number): string {
  * Format bearing with compass direction
  */
 function formatBearing(bearing: number): string {
-  const compass = bearingToCompass(bearing);
-  return `${Math.round(bearing)}° ${compass}`;
+  if (isNaN(bearing) || !isFinite(bearing)) {
+    return "0° N";
+  }
+  const normalizedBearing = ((bearing % 360) + 360) % 360; // Normalize to 0-360
+  const compass = bearingToCompass(normalizedBearing);
+  return `${Math.round(normalizedBearing)}° ${compass}`;
 }
 
 interface FeedItemProps {
@@ -171,7 +179,7 @@ const FeedItem: React.FC<FeedItemProps> = ({ observation, distance, bearing: bea
             <Text style={[styles.feedItemDistance, { color: theme.text.secondary }]} allowFontScaling={true}>
               {formatDistance(distance)}
             </Text>
-            {bearingDeg !== null && (
+            {bearingDeg !== null && !isNaN(bearingDeg) && isFinite(bearingDeg) && (
               <>
                 <Ionicons
                   name="arrow-up-circle-outline"
@@ -219,21 +227,34 @@ export const FeedView: React.FC<FeedViewProps> = ({
     }
 
     // Calculate distance and bearing for each observation and sort
-    const withDistance = filtered.map((obs) => ({
-      observation: obs,
-      distance: distanceKm(
-        userLocation.latitude,
-        userLocation.longitude,
-        obs.lat,
-        obs.lng
-      ),
-      bearing: bearing(
-        userLocation.latitude,
-        userLocation.longitude,
-        obs.lat,
-        obs.lng
-      ),
-    }));
+    const withDistance = filtered.map((obs) => {
+      try {
+        const dist = distanceKm(
+          userLocation.latitude,
+          userLocation.longitude,
+          obs.lat,
+          obs.lng
+        );
+        const bear = bearing(
+          userLocation.latitude,
+          userLocation.longitude,
+          obs.lat,
+          obs.lng
+        );
+        return {
+          observation: obs,
+          distance: isNaN(dist) || !isFinite(dist) ? null : dist,
+          bearing: isNaN(bear) || !isFinite(bear) ? null : bear,
+        };
+      } catch (error) {
+        console.error("Error calculating distance/bearing:", error);
+        return {
+          observation: obs,
+          distance: null as number | null,
+          bearing: null as number | null,
+        };
+      }
+    });
 
     return withDistance.sort((a, b) => {
       // If either distance is null, put it at the end
@@ -274,8 +295,12 @@ export const FeedView: React.FC<FeedViewProps> = ({
 
   // Handle scroll to detect when near end
   const handleEndReached = () => {
-    if (!isLoadingMore && !isLoading && userLocation) {
-      onLoadMore();
+    try {
+      if (!isLoadingMore && !isLoading && userLocation && onLoadMore) {
+        onLoadMore();
+      }
+    } catch (error) {
+      console.error("Error in handleEndReached:", error);
     }
   };
 
