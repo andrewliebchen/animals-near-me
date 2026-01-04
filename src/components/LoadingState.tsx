@@ -35,8 +35,8 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
 const styles = StyleSheet.create({
   container: {
     position: "absolute",
-    top: 70,
-    left: 16,
+    bottom: 80,
+    alignSelf: "center",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -47,7 +47,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 4,
     elevation: 3,
-    zIndex: 1000,
+    zIndex: 100, // Below the detail card (BottomSheet has higher z-index)
   },
   text: {
     fontSize: 14,

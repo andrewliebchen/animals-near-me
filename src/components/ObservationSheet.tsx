@@ -25,11 +25,13 @@ import { useTheme } from "../utils/theme";
 interface ObservationSheetProps {
   observation: Observation | null;
   onClose: () => void;
+  onShowOnMap?: () => void;
 }
 
 export const ObservationSheet: React.FC<ObservationSheetProps> = ({
   observation,
   onClose,
+  onShowOnMap,
 }) => {
   const theme = useTheme();
   const snapPoints = useMemo(() => ["40%", "90%"], []);
@@ -242,6 +244,25 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
     },
   };
 
+  // Create diffuse shadow that works in both light and dark modes
+  // Creates a subtle "step-off" effect from the background
+  const isDark = theme.background.primary === "#000000";
+  
+  // In dark mode, use a subtle light shadow for separation
+  // In light mode, use a soft dark shadow
+  const shadowColor = isDark 
+    ? "rgba(255, 255, 255, 0.08)"  // Subtle white glow in dark mode
+    : "rgba(0, 0, 0, 0.12)";       // Soft black shadow in light mode
+  
+  const shadowStyle = {
+    backgroundColor: theme.background.card,
+    shadowColor,
+    shadowOffset: { width: 0, height: -2 }, // Slight upward shadow
+    shadowOpacity: 1,
+    shadowRadius: 20, // Large radius for diffuse effect
+    elevation: 16, // Android shadow - higher for more prominence
+  };
+
   return (
     <>
     <BottomSheet
@@ -253,7 +274,7 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
       onChange={() => {}}
       enableDynamicSizing={false}
       handleIndicatorStyle={{ backgroundColor: theme.border, width: 80 }}
-      backgroundStyle={{ backgroundColor: theme.background.card }}
+      backgroundStyle={shadowStyle}
     >
       <BottomSheetScrollView style={dynamicStyles.content}>
         {/* Loading overlay during transition */}
@@ -341,6 +362,19 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
             onPress={handleOpenDetail}
           >
             <Text style={styles.linkText}>View on {providerName} →</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Show on Map Button */}
+        {onShowOnMap && (
+          <TouchableOpacity
+            style={dynamicStyles.linkButton}
+            onPress={onShowOnMap}
+          >
+            <View style={styles.linkButtonContent}>
+              <Ionicons name="map-outline" size={18} color="#3B82F6" />
+              <Text style={styles.linkText}>Show on map</Text>
+            </View>
           </TouchableOpacity>
         )}
 
@@ -479,6 +513,11 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     alignItems: "center",
+  },
+  linkButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   linkText: {
     fontSize: 16,

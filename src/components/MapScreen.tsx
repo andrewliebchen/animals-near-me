@@ -15,6 +15,8 @@ import { LoadingState } from "./LoadingState";
 import { ErrorState } from "./ErrorState";
 import { ColorLegend } from "./ColorLegend";
 import { FilterSheet } from "./FilterSheet";
+import { FeedView } from "./FeedView";
+import { Header } from "./Header";
 import { countActiveFilters } from "../types/filters";
 import { useTheme } from "../utils/theme";
 
@@ -86,18 +88,29 @@ export const MapScreen: React.FC = () => {
     selectedObservation,
     viewport,
     isLoading,
+    isLoadingMore,
     error,
     filters,
     fetchObservationsForViewport,
+    fetchMoreObservationsForFeed,
     setSelectedObservation,
     setViewport,
     setFilters,
     clearError,
+    resetFeedRadius,
   } = useObservationStore();
 
   const mapRef = useRef<any>(null);
   const [showLegend, setShowLegend] = useState(false);
   const [showFilterSheet, setShowFilterSheet] = useState(false);
+  const [activeView, setActiveView] = useState<"map" | "feed">("map");
+
+  // Reset feed radius when switching to map view
+  useEffect(() => {
+    if (activeView === "map") {
+      resetFeedRadius();
+    }
+  }, [activeView, resetFeedRadius]);
   const isZoomingIntoClusterRef = useRef(false);
   const lastCenteredObservationIdRef = useRef<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -516,98 +529,168 @@ export const MapScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <ClusteredMapView
-        ref={mapRef}
-        style={styles.map}
-        initialRegion={DEFAULT_REGION}
-        onRegionChangeComplete={handleRegionChangeComplete}
-        showsUserLocation={true}
-        showsMyLocationButton={true}
-        onLongPress={() => setShowLegend(!showLegend)}
-        clusteringEnabled={viewport ? viewport.latitudeDelta >= 0.03 : true}
-        clusterColor="#2563EB"
-        clusterTextColor="#FFFFFF"
-        radius={60}
-        extent={512}
-        minZoom={0}
-        maxZoom={20}
-        minPoints={2}
-        onClusterPress={handleClusterPress}
-        renderCluster={renderCluster}
-        preserveClusterPressBehavior={true}
-        spiralEnabled={false}
-        mapType="terrain"
-        customMapStyle={CUSTOM_MAP_STYLE}
-      >
-        {displayedObservations.map((item) => (
-          <ObservationMarker
-            key={item.observation.id}
-            observation={item.observation}
-            onPress={setSelectedObservation}
-            coordinate={{
-              latitude: item.observation.lat,
-              longitude: item.observation.lng,
-            }}
-            offset={item.offset}
-            selected={selectedObservation?.id === item.observation.id}
-          />
-        ))}
-      </ClusteredMapView>
+      {/* Header Component */}
+      <Header
+        activeView={activeView}
+        onViewChange={setActiveView}
+        filters={filters}
+        onFilterPress={() => setShowFilterSheet(!showFilterSheet)}
+        showBackground={activeView === "feed"}
+      />
 
-      {isLoading && <LoadingState />}
-      {error && <ErrorState error={error} onRetry={handleRetry} />}
-      <ColorLegend visible={showLegend} />
+      {/* Map View */}
+      {activeView === "map" && (
+        <>
+          <ClusteredMapView
+            ref={mapRef}
+            style={styles.map}
+            initialRegion={DEFAULT_REGION}
+            onRegionChangeComplete={handleRegionChangeComplete}
+            showsUserLocation={true}
+            showsMyLocationButton={true}
+            onLongPress={() => setShowLegend(!showLegend)}
+            clusteringEnabled={viewport ? viewport.latitudeDelta >= 0.03 : true}
+            clusterColor="#2563EB"
+            clusterTextColor="#FFFFFF"
+            radius={60}
+            extent={512}
+            minZoom={0}
+            maxZoom={20}
+            minPoints={2}
+            onClusterPress={handleClusterPress}
+            renderCluster={renderCluster}
+            preserveClusterPressBehavior={true}
+            spiralEnabled={false}
+            mapType="terrain"
+            customMapStyle={CUSTOM_MAP_STYLE}
+          >
+            {displayedObservations.map((item) => (
+              <ObservationMarker
+                key={item.observation.id}
+                observation={item.observation}
+                onPress={setSelectedObservation}
+                coordinate={{
+                  latitude: item.observation.lat,
+                  longitude: item.observation.lng,
+                }}
+                offset={item.offset}
+                selected={selectedObservation?.id === item.observation.id}
+              />
+            ))}
+          </ClusteredMapView>
 
-      {/* Filter Button */}
-      <TouchableOpacity
-        style={[
-          styles.filterButton,
-          {
-            backgroundColor: theme.background.card,
-            shadowColor: theme.shadow.color,
-            shadowOpacity: theme.shadow.opacity,
-          },
-        ]}
-        onPress={() => setShowFilterSheet(!showFilterSheet)}
-        activeOpacity={0.8}
-      >
-        <Text
-          style={[styles.filterButtonText, { color: theme.text.primary }]}
-        >
-          Filter
-        </Text>
-        {countActiveFilters(filters) > 0 && (
-          <View style={styles.filterBadge}>
-            <Text style={styles.filterBadgeText}>
-              {countActiveFilters(filters)}
+          {isLoading && <LoadingState />}
+          {error && <ErrorState error={error} onRetry={handleRetry} />}
+          <ColorLegend visible={showLegend} />
+
+          {/* Filter Button - Map View */}
+          <TouchableOpacity
+            style={[
+              styles.filterButton,
+              {
+                backgroundColor: theme.background.card,
+                shadowColor: theme.shadow.color,
+                shadowOpacity: theme.shadow.opacity,
+              },
+            ]}
+            onPress={() => setShowFilterSheet(!showFilterSheet)}
+            activeOpacity={0.8}
+          >
+            <Text
+              style={[styles.filterButtonText, { color: theme.text.primary }]}
+            >
+              Filter
             </Text>
-          </View>
-        )}
-      </TouchableOpacity>
+            {countActiveFilters(filters) > 0 && (
+              <View style={styles.filterBadge}>
+                <Text style={styles.filterBadgeText}>
+                  {countActiveFilters(filters)}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
 
-      {/* Location Button */}
-      <TouchableOpacity
-        style={[
-          styles.locationButton,
-          {
-            backgroundColor: theme.background.card,
-            shadowColor: theme.shadow.color,
-            shadowOpacity: theme.shadow.opacity,
-          },
-        ]}
-        onPress={handleCenterOnLocation}
-        activeOpacity={0.8}
-      >
-        <Ionicons
-          name="locate"
-          size={20}
-          color={theme.text.primary}
-        />
-      </TouchableOpacity>
+          {/* Location Button - Map View Only */}
+          <TouchableOpacity
+            style={[
+              styles.locationButton,
+              {
+                backgroundColor: theme.background.card,
+                shadowColor: theme.shadow.color,
+                shadowOpacity: theme.shadow.opacity,
+              },
+            ]}
+            onPress={handleCenterOnLocation}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name="locate"
+              size={20}
+              color={theme.text.primary}
+            />
+          </TouchableOpacity>
+        </>
+      )}
+
+      {/* Feed View */}
+      {activeView === "feed" && (
+        <>
+          <FeedView
+            observations={observations}
+            filters={filters}
+            userLocation={userLocation}
+            onObservationPress={setSelectedObservation}
+            isLoading={isLoading}
+            isLoadingMore={isLoadingMore}
+            onLoadMore={() => {
+              if (userLocation) {
+                fetchMoreObservationsForFeed(userLocation);
+              }
+            }}
+          />
+          {error && <ErrorState error={error} onRetry={handleRetry} />}
+        </>
+      )}
 
       <ObservationSheet
         observation={selectedObservation}
         onClose={() => setSelectedObservation(null)}
+        onShowOnMap={
+          selectedObservation
+            ? () => {
+                // Switch to map view if in feed view
+                if (activeView === "feed") {
+                  setActiveView("map");
+                }
+                // Center map on observation
+                if (mapRef.current && selectedObservation) {
+                  // Set flag to prevent refetching when centering on observation
+                  isZoomingIntoClusterRef.current = true;
+
+                  // Adjust center point to position marker higher on screen (accounting for bottom sheet)
+                  const currentViewport = viewport || DEFAULT_REGION;
+                  const verticalOffset = currentViewport.latitudeDelta * 0.15;
+                  const adjustedLatitude = selectedObservation.lat - verticalOffset;
+
+                  // Animate to the adjusted coordinate with a reasonable zoom level
+                  mapRef.current.animateToRegion(
+                    {
+                      latitude: adjustedLatitude,
+                      longitude: selectedObservation.lng,
+                      latitudeDelta: 0.01,
+                      longitudeDelta: 0.01,
+                    },
+                    500
+                  );
+
+                  // Reset the flag after animation completes
+                  setTimeout(() => {
+                    isZoomingIntoClusterRef.current = false;
+                  }, 1000);
+                }
+              }
+            : undefined
+        }
       />
 
       <FilterSheet
