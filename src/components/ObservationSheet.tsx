@@ -256,6 +256,8 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
   
   const shadowStyle = {
     backgroundColor: theme.background.card,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
     shadowColor,
     shadowOffset: { width: 0, height: -2 }, // Slight upward shadow
     shadowOpacity: 1,
@@ -273,6 +275,7 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
       onClose={onClose}
       onChange={() => {}}
       enableDynamicSizing={false}
+      topInset={130}
       handleIndicatorStyle={{ backgroundColor: theme.border, width: 80 }}
       backgroundStyle={shadowStyle}
     >
@@ -369,7 +372,16 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
         {onShowOnMap && (
           <TouchableOpacity
             style={dynamicStyles.linkButton}
-            onPress={onShowOnMap}
+            onPress={() => {
+              // Collapse to smallest snap point (index 0 = 40%)
+              if (sheetRef.current) {
+                sheetRef.current.snapToIndex(0);
+              }
+              // Call the handler after a brief delay to allow collapse animation
+              setTimeout(() => {
+                onShowOnMap();
+              }, 100);
+            }}
           >
             <View style={styles.linkButtonContent}>
               <Ionicons name="map-outline" size={18} color="#3B82F6" />
@@ -433,7 +445,7 @@ const styles = StyleSheet.create({
   imageContainer: {
     width: "100%",
     height: 200,
-    borderRadius: 12,
+    borderRadius: 16,
     overflow: "hidden",
     marginBottom: 16,
   },
