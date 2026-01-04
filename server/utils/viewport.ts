@@ -73,5 +73,46 @@ export function distanceKm(
   return R * c;
 }
 
+/**
+ * Calculate bearing (azimuth) from point 1 to point 2 in degrees
+ * Returns bearing in degrees (0-360), where 0 is North
+ */
+export function bearing(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number
+): number {
+  // Validate inputs
+  if (
+    !isFinite(lat1) || !isFinite(lng1) || !isFinite(lat2) || !isFinite(lng2) ||
+    isNaN(lat1) || isNaN(lng1) || isNaN(lat2) || isNaN(lng2)
+  ) {
+    return 0; // Default to North if invalid
+  }
+
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const lat1Rad = (lat1 * Math.PI) / 180;
+  const lat2Rad = (lat2 * Math.PI) / 180;
+
+  const y = Math.sin(dLng) * Math.cos(lat2Rad);
+  const x =
+    Math.cos(lat1Rad) * Math.sin(lat2Rad) -
+    Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLng);
+
+  const bearingRad = Math.atan2(y, x);
+  const bearingDeg = (bearingRad * 180) / Math.PI;
+  
+  // Normalize to 0-360
+  const normalized = (bearingDeg + 360) % 360;
+  
+  // Validate result
+  if (!isFinite(normalized) || isNaN(normalized)) {
+    return 0;
+  }
+  
+  return normalized;
+}
+
 
 

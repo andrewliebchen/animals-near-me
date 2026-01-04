@@ -8,6 +8,10 @@ import { regionToViewportParams } from "../utils/viewport";
 import type { FilterParams } from "../types/filters";
 import { DEFAULT_FILTERS } from "../types/filters";
 
+// Module-level abort controllers for request cancellation
+let viewportAbortController: AbortController | null = null;
+let feedAbortController: AbortController | null = null;
+
 interface ObservationState {
   observations: Observation[];
   selectedObservation: Observation | null;
@@ -23,7 +27,7 @@ interface ObservationState {
   setSelectedObservation: (observation: Observation | null) => void;
   setViewport: (viewport: Region) => void;
   setFilters: (filters: FilterParams) => void;
-  fetchObservationsForViewport: (viewport: Region) => Promise<void>;
+  fetchObservationsForViewport: (viewport: Region, userLocation?: { latitude: number; longitude: number }) => Promise<void>;
   fetchMoreObservationsForFeed: (userLocation: { latitude: number; longitude: number }) => Promise<void>;
   clearError: () => void;
   resetFeedRadius: () => void;
@@ -59,13 +63,35 @@ export const useObservationStore = create<ObservationState>()(
         }
       },
 
-      fetchObservationsForViewport: async (viewport: Region) => {
+      fetchObservationsForViewport: async (viewport: Region, userLocation?: { latitude: number; longitude: number }) => {
+        // Cancel previous request if exists
+        if (viewportAbortController) {
+          viewportAbortController.abort();
+        }
+        
+        // Create new abort controller
+        viewportAbortController = new AbortController();
+        const signal = viewportAbortController.signal;
+        
         set({ isLoading: true, error: null });
         
         try {
           const viewportParams = regionToViewportParams(viewport);
           const filters = get().filters;
-          const newObservations = await fetchObservations(viewportParams, filters);
+          const newObservations = await fetchObservations(
+            viewportParams, 
+            filters,
+            {
+              userLocation,
+              limit: 1000, // Limit for map view
+              signal,
+            }
+          );
+          
+          // Check if request was aborted
+          if (signal.aborted) {
+            return;
+          }
           
           // Merge with existing observations instead of replacing
           // This ensures cluster counts remain accurate when zooming
@@ -87,6 +113,10 @@ export const useObservationStore = create<ObservationState>()(
           
           set({ observations: mergedObservations, viewport, isLoading: false });
         } catch (error) {
+          // Ignore abort errors
+          if (error instanceof Error && error.name === "AbortError") {
+            return;
+          }
           const errorMessage = error instanceof Error ? error.message : "Failed to fetch observations";
           set({ error: errorMessage, isLoading: false });
           console.error("Error fetching observations:", error);
@@ -102,6 +132,15 @@ export const useObservationStore = create<ObservationState>()(
         if (currentState.isLoadingMore || currentState.isLoading) {
           return; // Don't fetch if already loading
         }
+
+        // Cancel previous feed request if exists
+        if (feedAbortController) {
+          feedAbortController.abort();
+        }
+        
+        // Create new abort controller
+        feedAbortController = new AbortController();
+        const signal = feedAbortController.signal;
 
         set({ isLoadingMore: true, error: null });
         
@@ -121,7 +160,20 @@ export const useObservationStore = create<ObservationState>()(
 
           const viewportParams = regionToViewportParams(expandedViewport);
           const filters = currentState.filters;
-          const newObservations = await fetchObservations(viewportParams, filters);
+          const newObservations = await fetchObservations(
+            viewportParams, 
+            filters,
+            {
+              userLocation,
+              limit: 200, // Limit for feed view to prevent memory issues
+              signal,
+            }
+          );
+          
+          // Check if request was aborted
+          if (signal.aborted) {
+            return;
+          }
           
           // Merge with existing observations
           const existingObservations = currentState.observations;
@@ -146,6 +198,10 @@ export const useObservationStore = create<ObservationState>()(
             isLoadingMore: false 
           });
         } catch (error) {
+          // Ignore abort errors
+          if (error instanceof Error && error.name === "AbortError") {
+            return;
+          }
           const errorMessage = error instanceof Error ? error.message : "Failed to fetch more observations";
           set({ error: errorMessage, isLoadingMore: false });
           console.error("Error fetching more observations:", error);

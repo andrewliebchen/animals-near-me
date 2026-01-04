@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { fetchRecentEbird } from "../../server/providers/ebird";
 import { fetchInat } from "../../server/providers/inat";
-import { viewportToBoundingBox, viewportToCenterRadius } from "../../server/utils/viewport";
+import { viewportToBoundingBox, viewportToCenterRadius, distanceKm, bearing } from "../../server/utils/viewport";
 import { deduplicateObservations } from "../../server/utils/dedupe";
 import { getCacheKey, getCached, setCached } from "../../server/utils/cache";
 import type { Observation, Provider, TaxaBucket } from "../../src/types/observation";
@@ -23,6 +23,14 @@ export default async function handler(
     const latDelta = parseFloat(req.query.latDelta as string);
     const lngDelta = parseFloat(req.query.lngDelta as string);
 
+    // Optional user location for distance/bearing calculation
+    const userLat = req.query.userLat ? parseFloat(req.query.userLat as string) : null;
+    const userLng = req.query.userLng ? parseFloat(req.query.userLng as string) : null;
+
+    // Optional limit parameter
+    const limitParam = req.query.limit ? parseInt(req.query.limit as string) : null;
+    const limit = limitParam && limitParam > 0 ? Math.min(limitParam, 1000) : null; // Max 1000
+
     // Validate parameters
     if (
       isNaN(lat) ||
@@ -34,6 +42,16 @@ export default async function handler(
     ) {
       return res.status(400).json({
         error: "Invalid parameters. Required: lat, lng, latDelta, lngDelta",
+      });
+    }
+
+    // Validate user location if provided
+    if (
+      (userLat !== null && (isNaN(userLat) || !isFinite(userLat))) ||
+      (userLng !== null && (isNaN(userLng) || !isFinite(userLng)))
+    ) {
+      return res.status(400).json({
+        error: "Invalid user location parameters",
       });
     }
 
@@ -80,13 +98,27 @@ export default async function handler(
 
     const viewport = { lat, lng, latDelta, lngDelta };
 
-    // Check cache first (with filters)
+    // Check cache first (with filters, but not user location - that's user-specific)
+    // Only cache if user location is not provided
     const cacheKey = getCacheKey(lat, lng, latDelta, lngDelta, filters);
-    const cached = getCached(cacheKey);
+    const cached = userLat === null && userLng === null ? getCached(cacheKey) : null;
     
     if (cached) {
+      // If limit is requested on cached data, apply it
+      let result = cached;
+      if (limit !== null && limit > 0) {
+        // Sort by observedAt (most recent first) if no user location
+        result = [...cached].sort((a, b) => {
+          const dateA = a.observedAt ? new Date(a.observedAt).getTime() : 0;
+          const dateB = b.observedAt ? new Date(b.observedAt).getTime() : 0;
+          return dateB - dateA;
+        }).slice(0, limit);
+      }
       return res.status(200).json({
-        observations: cached,
+        observations: result,
+        totalCount: cached.length,
+        returnedCount: result.length,
+        hasMore: limit !== null && cached.length > limit,
       });
     }
 
@@ -174,12 +206,53 @@ export default async function handler(
       filtered = filtered.filter((obs) => obs.photoUrl === undefined);
     }
 
-    // Cache the results
-    setCached(cacheKey, filtered);
+    // Calculate distances and bearings if user location provided
+    let processedObservations = filtered;
+    if (userLat !== null && userLng !== null && isFinite(userLat) && isFinite(userLng)) {
+      // Calculate distance and bearing for each observation
+      processedObservations = filtered.map((obs) => {
+        const dist = distanceKm(userLat, userLng, obs.lat, obs.lng);
+        const bear = bearing(userLat, userLng, obs.lat, obs.lng);
+        return {
+          ...obs,
+          distance: isNaN(dist) || !isFinite(dist) ? undefined : dist,
+          bearing: isNaN(bear) || !isFinite(bear) ? undefined : bear,
+        };
+      });
 
-    // Return clean observations
+      // Sort by distance (closest first)
+      processedObservations.sort((a, b) => {
+        const distA = a.distance ?? Infinity;
+        const distB = b.distance ?? Infinity;
+        return distA - distB;
+      });
+    } else if (limit !== null) {
+      // If no user location but limit provided, sort by observedAt (most recent first)
+      processedObservations = [...filtered].sort((a, b) => {
+        const dateA = a.observedAt ? new Date(a.observedAt).getTime() : 0;
+        const dateB = b.observedAt ? new Date(b.observedAt).getTime() : 0;
+        return dateB - dateA;
+      });
+    }
+
+    // Apply limit if provided
+    const totalCount = processedObservations.length;
+    let returnedObservations = processedObservations;
+    if (limit !== null && limit > 0) {
+      returnedObservations = processedObservations.slice(0, limit);
+    }
+
+    // Cache the results (only if no user location - user-specific data shouldn't be cached)
+    if (userLat === null && userLng === null) {
+      setCached(cacheKey, filtered); // Cache original filtered data without distance/bearing
+    }
+
+    // Return observations with metadata
     return res.status(200).json({
-      observations: filtered,
+      observations: returnedObservations,
+      totalCount,
+      returnedCount: returnedObservations.length,
+      hasMore: limit !== null && totalCount > limit,
     });
   } catch (error) {
     console.error("Error in observations endpoint:", error);

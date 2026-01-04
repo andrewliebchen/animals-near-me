@@ -7,6 +7,9 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
 
 export interface FetchObservationsResponse {
   observations: Observation[];
+  totalCount?: number;
+  returnedCount?: number;
+  hasMore?: boolean;
 }
 
 export interface FetchObservationResponse {
@@ -18,7 +21,12 @@ export interface FetchObservationResponse {
  */
 export async function fetchObservations(
   viewport: ViewportParams,
-  filters?: FilterParams
+  filters?: FilterParams,
+  options?: {
+    userLocation?: { latitude: number; longitude: number };
+    limit?: number;
+    signal?: AbortSignal;
+  }
 ): Promise<Observation[]> {
   const params = new URLSearchParams({
     lat: viewport.lat.toString(),
@@ -43,6 +51,17 @@ export async function fetchObservations(
     }
   }
 
+  // Add user location if provided
+  if (options?.userLocation) {
+    params.set("userLat", options.userLocation.latitude.toString());
+    params.set("userLng", options.userLocation.longitude.toString());
+  }
+
+  // Add limit if provided
+  if (options?.limit !== undefined && options.limit > 0) {
+    params.set("limit", options.limit.toString());
+  }
+
   const url = `${API_URL}/observations?${params.toString()}`;
 
   try {
@@ -51,6 +70,7 @@ export async function fetchObservations(
       headers: {
         "Content-Type": "application/json",
       },
+      signal: options?.signal,
     });
 
     if (!response.ok) {
@@ -60,6 +80,11 @@ export async function fetchObservations(
     const data: FetchObservationsResponse = await response.json();
     return data.observations || [];
   } catch (error) {
+    // Handle abort errors gracefully
+    if (error instanceof Error && error.name === "AbortError") {
+      // Request was cancelled, return empty array
+      return [];
+    }
     console.error("Error fetching observations:", error);
     throw error;
   }

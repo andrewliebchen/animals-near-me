@@ -68,9 +68,9 @@ export const Header: React.FC<HeaderProps> = ({
   }, [showBackground, theme.background.primary]);
 
   const headerContent = (
-    <View style={styles.headerContent}>
+    <View style={styles.headerContent} pointerEvents="box-none">
       {/* Tabs - Single Pill */}
-      <View style={tabsContainerStyle}>
+      <View style={tabsContainerStyle} pointerEvents="auto">
         <TouchableOpacity
           style={[
             styles.tab,
@@ -133,6 +133,7 @@ export const Header: React.FC<HeaderProps> = ({
           style={filterButtonStyle}
           onPress={onFilterPress}
           activeOpacity={0.8}
+          pointerEvents="auto"
         >
           <Text
             style={[styles.filterButtonText, { color: theme.text.primary }]}

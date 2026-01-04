@@ -224,9 +224,37 @@ export const FeedView: React.FC<FeedViewProps> = ({
     try {
       const filtered = applyFilters(observations, filters);
       
+      // Filter out invalid observations first
+      const validObservations = filtered.filter((obs) => {
+        return (
+          obs &&
+          typeof obs === "object" &&
+          typeof obs.lat === "number" &&
+          typeof obs.lng === "number" &&
+          isFinite(obs.lat) &&
+          isFinite(obs.lng) &&
+          !isNaN(obs.lat) &&
+          !isNaN(obs.lng)
+        );
+      });
+
+      // Check if observations already have server-calculated distances
+      const hasServerDistances = validObservations.length > 0 && 
+        validObservations.some(obs => obs.distance !== undefined);
+
+      if (hasServerDistances) {
+        // Use server-calculated distances - already sorted by server
+        return validObservations.map((obs) => ({
+          observation: obs,
+          distance: obs.distance ?? null,
+          bearing: obs.bearing ?? null,
+        }));
+      }
+
+      // Fallback to client-side calculation if server didn't provide distances
       if (!userLocation) {
         // Return observations without distance when user location is not available
-        return filtered.map((obs) => ({
+        return validObservations.map((obs) => ({
           observation: obs,
           distance: null as number | null,
           bearing: null as number | null,
@@ -243,32 +271,16 @@ export const FeedView: React.FC<FeedViewProps> = ({
         isNaN(userLocation.longitude)
       ) {
         console.warn("FeedView: Invalid userLocation", userLocation);
-        return filtered.map((obs) => ({
+        return validObservations.map((obs) => ({
           observation: obs,
           distance: null as number | null,
           bearing: null as number | null,
         }));
       }
 
-      // Calculate distance and bearing for each observation and sort
-      const withDistance = filtered.map((obs) => {
+      // Calculate distance and bearing client-side (fallback)
+      const withDistance = validObservations.map((obs) => {
         try {
-          // Validate observation coordinates
-          if (
-            typeof obs.lat !== "number" ||
-            typeof obs.lng !== "number" ||
-            !isFinite(obs.lat) ||
-            !isFinite(obs.lng) ||
-            isNaN(obs.lat) ||
-            isNaN(obs.lng)
-          ) {
-            return {
-              observation: obs,
-              distance: null as number | null,
-              bearing: null as number | null,
-            };
-          }
-
           const dist = distanceKm(
             userLocation.latitude,
             userLocation.longitude,
@@ -391,20 +403,32 @@ export const FeedView: React.FC<FeedViewProps> = ({
     <View style={[styles.container, { backgroundColor: feedBackgroundColor }]}>
       <FlatList
         data={filteredAndSorted}
-        keyExtractor={(item) => {
+        keyExtractor={(item, index) => {
           // Safety check for item structure
-          if (!item || !item.observation || !item.observation.id) {
+          if (!item || !item.observation) {
             console.warn("FeedView: Invalid item in filteredAndSorted", item);
-            return `invalid-${Math.random()}`;
+            return `invalid-${index}`;
           }
-          return item.observation.id;
+          // Use ID if available, otherwise use index as fallback
+          const id = item.observation.id;
+          if (id && typeof id === "string" && id.length > 0) {
+            return id;
+          }
+          return `obs-${index}`;
         }}
-        renderItem={({ item }) => {
+        renderItem={({ item, index }) => {
           // Safety check before rendering item
           if (!item || !item.observation) {
             console.warn("FeedView: Invalid item in renderItem", item);
-            return null;
+            return <View key={`empty-${index}`} style={{ height: 0 }} />;
           }
+          
+          // Additional validation for observation properties
+          if (typeof item.observation.lat !== "number" || typeof item.observation.lng !== "number") {
+            console.warn("FeedView: Observation missing coordinates", item.observation);
+            return <View key={`invalid-coords-${index}`} style={{ height: 0 }} />;
+          }
+          
           return (
             <FeedItem
               observation={item.observation}
@@ -428,6 +452,7 @@ export const FeedView: React.FC<FeedViewProps> = ({
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.5} // Trigger when 50% from bottom
         ListFooterComponent={renderFooter}
+        removeClippedSubviews={false} // Prevent rendering issues
       />
     </View>
   );

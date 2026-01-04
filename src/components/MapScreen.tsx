@@ -105,6 +105,7 @@ export const MapScreen: React.FC = () => {
   const [showLegend, setShowLegend] = useState(false);
   const [showFilterSheet, setShowFilterSheet] = useState(false);
   const [activeView, setActiveView] = useState<"map" | "feed">("map");
+  const [feedViewReady, setFeedViewReady] = useState(false);
 
   // Reset feed radius when switching to map view
   useEffect(() => {
@@ -121,6 +122,30 @@ export const MapScreen: React.FC = () => {
       setSelectedObservation(null);
     }
   }, [activeView, selectedObservation, setSelectedObservation]);
+
+  // Debounce feed view initialization to allow UI to settle
+  useEffect(() => {
+    if (activeView === "feed") {
+      // Reset ready state and start delay timer
+      setFeedViewReady(false);
+      
+      // If we have user location and viewport, fetch observations with user location
+      if (userLocation && viewport) {
+        fetchObservationsForViewport(viewport, userLocation);
+      }
+      
+      const timer = setTimeout(() => {
+        setFeedViewReady(true);
+      }, 100); // 100ms delay
+
+      return () => {
+        clearTimeout(timer);
+      };
+    } else {
+      // Immediately set to false when switching away from feed
+      setFeedViewReady(false);
+    }
+  }, [activeView, userLocation, viewport, fetchObservationsForViewport]);
   const isZoomingIntoClusterRef = useRef(false);
   const lastCenteredObservationIdRef = useRef<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -607,6 +632,7 @@ export const MapScreen: React.FC = () => {
                 backgroundColor: theme.background.card,
                 shadowColor: theme.shadow.color,
                 shadowOpacity: theme.shadow.opacity,
+                zIndex: 20, // Higher than header (zIndex: 10)
               },
             ]}
             onPress={() => setShowFilterSheet(!showFilterSheet)}
@@ -635,6 +661,7 @@ export const MapScreen: React.FC = () => {
                   backgroundColor: theme.background.card,
                   shadowColor: theme.shadow.color,
                   shadowOpacity: theme.shadow.opacity,
+                  zIndex: 20, // Higher than header (zIndex: 10)
                 },
               ]}
               onPress={handleCenterOnLocation}
@@ -653,19 +680,25 @@ export const MapScreen: React.FC = () => {
       {/* Feed View */}
       {activeView === "feed" && (
         <>
-          <FeedView
-            observations={observations}
-            filters={filters}
-            userLocation={userLocation}
-            onObservationPress={setSelectedObservation}
-            isLoading={isLoading}
-            isLoadingMore={isLoadingMore}
-            onLoadMore={() => {
-              if (userLocation) {
-                fetchMoreObservationsForFeed(userLocation);
-              }
-            }}
-          />
+          {feedViewReady ? (
+            <FeedView
+              observations={observations}
+              filters={filters}
+              userLocation={userLocation}
+              onObservationPress={setSelectedObservation}
+              isLoading={isLoading}
+              isLoadingMore={isLoadingMore}
+              onLoadMore={() => {
+                if (userLocation) {
+                  fetchMoreObservationsForFeed(userLocation);
+                }
+              }}
+            />
+          ) : (
+            <View style={styles.feedContainer}>
+              <LoadingState />
+            </View>
+          )}
           {error && <ErrorState error={error} onRetry={handleRetry} />}
         </>
       )}
@@ -792,6 +825,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 4,
     elevation: 3,
+  },
+  feedContainer: {
+    flex: 1,
   },
 });
 

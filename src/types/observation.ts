@@ -31,6 +31,10 @@ export type Observation = {
   photoUrl?: string;
   detailUrl?: string;
 
+  // Server-calculated distance and bearing (optional)
+  distance?: number; // Distance in km from user location
+  bearing?: number; // Bearing in degrees (0-360) from user location
+
   raw: any; // Original API response for debugging
 };
 
