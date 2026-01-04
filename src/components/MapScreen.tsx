@@ -101,6 +101,7 @@ export const MapScreen: React.FC = () => {
   } = useObservationStore();
 
   const mapRef = useRef<any>(null);
+  const initialRegionRef = useRef<Region | null>(null);
   const [showLegend, setShowLegend] = useState(false);
   const [showFilterSheet, setShowFilterSheet] = useState(false);
   const [activeView, setActiveView] = useState<"map" | "feed">("map");
@@ -227,6 +228,11 @@ export const MapScreen: React.FC = () => {
   // Handle region change
   const handleRegionChangeComplete = useCallback(
     (region: Region, details?: any, markers?: any[]) => {
+      // Store the initial region on first load
+      if (!initialRegionRef.current) {
+        initialRegionRef.current = region;
+      }
+      
       setViewport(region);
       
       // Don't refetch if we're programmatically zooming into a cluster
@@ -552,8 +558,7 @@ export const MapScreen: React.FC = () => {
         <ClusteredMapView
           ref={mapRef}
           style={styles.map}
-          initialRegion={viewport || DEFAULT_REGION}
-          region={viewport || undefined}
+          initialRegion={initialRegionRef.current || viewport || DEFAULT_REGION}
           onRegionChangeComplete={handleRegionChangeComplete}
           showsUserLocation={true}
           showsMyLocationButton={true}
@@ -737,6 +742,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     opacity: 0,
     pointerEvents: "none",
+    zIndex: -1, // Ensure it's behind other content
   },
   map: {
     flex: 1,

@@ -215,54 +215,98 @@ export const FeedView: React.FC<FeedViewProps> = ({
 
   // Apply filters and sort by distance
   const filteredAndSorted = useMemo(() => {
-    const filtered = applyFilters(observations, filters);
-    
-    if (!userLocation) {
-      // Return observations without distance when user location is not available
-      return filtered.map((obs) => ({
-        observation: obs,
-        distance: null as number | null,
-        bearing: null as number | null,
-      }));
+    // Safety check: ensure observations is an array
+    if (!Array.isArray(observations)) {
+      console.warn("FeedView: observations is not an array", observations);
+      return [];
     }
 
-    // Calculate distance and bearing for each observation and sort
-    const withDistance = filtered.map((obs) => {
-      try {
-        const dist = distanceKm(
-          userLocation.latitude,
-          userLocation.longitude,
-          obs.lat,
-          obs.lng
-        );
-        const bear = bearing(
-          userLocation.latitude,
-          userLocation.longitude,
-          obs.lat,
-          obs.lng
-        );
-        return {
-          observation: obs,
-          distance: isNaN(dist) || !isFinite(dist) ? null : dist,
-          bearing: isNaN(bear) || !isFinite(bear) ? null : bear,
-        };
-      } catch (error) {
-        console.error("Error calculating distance/bearing:", error);
-        return {
+    try {
+      const filtered = applyFilters(observations, filters);
+      
+      if (!userLocation) {
+        // Return observations without distance when user location is not available
+        return filtered.map((obs) => ({
           observation: obs,
           distance: null as number | null,
           bearing: null as number | null,
-        };
+        }));
       }
-    });
 
-    return withDistance.sort((a, b) => {
-      // If either distance is null, put it at the end
-      if (a.distance === null && b.distance === null) return 0;
-      if (a.distance === null) return 1;
-      if (b.distance === null) return -1;
-      return a.distance - b.distance;
-    });
+      // Validate userLocation
+      if (
+        typeof userLocation.latitude !== "number" ||
+        typeof userLocation.longitude !== "number" ||
+        !isFinite(userLocation.latitude) ||
+        !isFinite(userLocation.longitude) ||
+        isNaN(userLocation.latitude) ||
+        isNaN(userLocation.longitude)
+      ) {
+        console.warn("FeedView: Invalid userLocation", userLocation);
+        return filtered.map((obs) => ({
+          observation: obs,
+          distance: null as number | null,
+          bearing: null as number | null,
+        }));
+      }
+
+      // Calculate distance and bearing for each observation and sort
+      const withDistance = filtered.map((obs) => {
+        try {
+          // Validate observation coordinates
+          if (
+            typeof obs.lat !== "number" ||
+            typeof obs.lng !== "number" ||
+            !isFinite(obs.lat) ||
+            !isFinite(obs.lng) ||
+            isNaN(obs.lat) ||
+            isNaN(obs.lng)
+          ) {
+            return {
+              observation: obs,
+              distance: null as number | null,
+              bearing: null as number | null,
+            };
+          }
+
+          const dist = distanceKm(
+            userLocation.latitude,
+            userLocation.longitude,
+            obs.lat,
+            obs.lng
+          );
+          const bear = bearing(
+            userLocation.latitude,
+            userLocation.longitude,
+            obs.lat,
+            obs.lng
+          );
+          return {
+            observation: obs,
+            distance: isNaN(dist) || !isFinite(dist) ? null : dist,
+            bearing: isNaN(bear) || !isFinite(bear) ? null : bear,
+          };
+        } catch (error) {
+          console.error("Error calculating distance/bearing:", error);
+          return {
+            observation: obs,
+            distance: null as number | null,
+            bearing: null as number | null,
+          };
+        }
+      });
+
+      return withDistance.sort((a, b) => {
+        // If either distance is null, put it at the end
+        if (a.distance === null && b.distance === null) return 0;
+        if (a.distance === null) return 1;
+        if (b.distance === null) return -1;
+        return a.distance - b.distance;
+      });
+    } catch (error) {
+      console.error("Error in filteredAndSorted useMemo:", error);
+      return [];
+    }
   }, [observations, filters, userLocation]);
 
   // Feed background should be slightly darker than card background
@@ -296,8 +340,22 @@ export const FeedView: React.FC<FeedViewProps> = ({
   // Handle scroll to detect when near end
   const handleEndReached = () => {
     try {
-      if (!isLoadingMore && !isLoading && userLocation && onLoadMore) {
-        onLoadMore();
+      if (
+        !isLoadingMore &&
+        !isLoading &&
+        userLocation &&
+        onLoadMore &&
+        typeof onLoadMore === "function"
+      ) {
+        // Validate userLocation before calling
+        if (
+          typeof userLocation.latitude === "number" &&
+          typeof userLocation.longitude === "number" &&
+          isFinite(userLocation.latitude) &&
+          isFinite(userLocation.longitude)
+        ) {
+          onLoadMore();
+        }
       }
     } catch (error) {
       console.error("Error in handleEndReached:", error);
@@ -317,20 +375,54 @@ export const FeedView: React.FC<FeedViewProps> = ({
     );
   };
 
+  // Safety check before rendering
+  if (!Array.isArray(filteredAndSorted)) {
+    console.warn("FeedView: filteredAndSorted is not an array");
+    return (
+      <View style={[styles.container, styles.centerContent, { backgroundColor: feedBackgroundColor }]}>
+        <Text style={[styles.emptyText, { color: theme.text.secondary }]} allowFontScaling={true}>
+          Unable to load observations
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: feedBackgroundColor }]}>
       <FlatList
         data={filteredAndSorted}
-        keyExtractor={(item) => item.observation.id}
-        renderItem={({ item }) => (
-          <FeedItem
-            observation={item.observation}
-            distance={item.distance}
-            bearing={item.bearing}
-            onPress={() => onObservationPress(item.observation)}
-            theme={theme}
-          />
-        )}
+        keyExtractor={(item) => {
+          // Safety check for item structure
+          if (!item || !item.observation || !item.observation.id) {
+            console.warn("FeedView: Invalid item in filteredAndSorted", item);
+            return `invalid-${Math.random()}`;
+          }
+          return item.observation.id;
+        }}
+        renderItem={({ item }) => {
+          // Safety check before rendering item
+          if (!item || !item.observation) {
+            console.warn("FeedView: Invalid item in renderItem", item);
+            return null;
+          }
+          return (
+            <FeedItem
+              observation={item.observation}
+              distance={item.distance}
+              bearing={item.bearing}
+              onPress={() => {
+                try {
+                  if (onObservationPress && typeof onObservationPress === "function") {
+                    onObservationPress(item.observation);
+                  }
+                } catch (error) {
+                  console.error("Error in onObservationPress:", error);
+                }
+              }}
+              theme={theme}
+            />
+          );
+        }}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         onEndReached={handleEndReached}
