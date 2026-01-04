@@ -694,8 +694,6 @@ export const MapScreen: React.FC = () => {
           {feedViewReady ? (
             <FeedView
               observations={observations}
-              filters={filters}
-              userLocation={userLocation}
               onObservationPress={setSelectedObservation}
               isLoading={isLoading}
               isLoadingMore={isLoadingMore}

@@ -10,64 +10,15 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { Observation } from "../types/observation";
-import { distanceKm, bearing } from "../utils/viewport";
 import { getTaxaColor } from "../utils/colors";
 import { useTheme } from "../utils/theme";
-import { countActiveFilters } from "../types/filters";
-import type { FilterParams } from "../types/filters";
 
 interface FeedViewProps {
   observations: Observation[];
-  filters: FilterParams;
-  userLocation: { latitude: number; longitude: number } | null;
   onObservationPress: (observation: Observation) => void;
   isLoading: boolean;
   isLoadingMore: boolean;
   onLoadMore: () => void;
-}
-
-/**
- * Apply filters to observations
- */
-function applyFilters(observations: Observation[], filters: FilterParams): Observation[] {
-  return observations.filter((obs) => {
-    // Provider filter
-    if (filters.provider.length > 0 && !filters.provider.includes(obs.provider)) {
-      return false;
-    }
-
-    // Taxa filter
-    if (filters.taxa.length > 0 && !filters.taxa.includes(obs.taxaBucket)) {
-      return false;
-    }
-
-    // Photo filter
-    if (filters.hasPhoto === true && !obs.photoUrl) {
-      return false;
-    }
-    if (filters.hasPhoto === false && obs.photoUrl) {
-      return false;
-    }
-
-    // Recency filter
-    if (filters.recency && obs.observedAt) {
-      const observedDate = new Date(obs.observedAt);
-      const now = new Date();
-      const daysDiff = Math.floor((now.getTime() - observedDate.getTime()) / (1000 * 60 * 60 * 24));
-
-      if (filters.recency === "today" && daysDiff > 0) {
-        return false;
-      }
-      if (filters.recency === "this_week" && daysDiff > 7) {
-        return false;
-      }
-      if (filters.recency === "this_month" && daysDiff > 30) {
-        return false;
-      }
-    }
-
-    return true;
-  });
 }
 
 /**
@@ -208,8 +159,6 @@ const FeedItem: React.FC<FeedItemProps> = ({ observation, distance, bearing: bea
 
 export const FeedView: React.FC<FeedViewProps> = ({
   observations,
-  filters,
-  userLocation,
   onObservationPress,
   isLoading,
   isLoadingMore,
@@ -228,177 +177,22 @@ export const FeedView: React.FC<FeedViewProps> = ({
     }
   }, [onObservationPress]);
 
-  // Apply filters and sort by distance
-  const filteredAndSorted = useMemo(() => {
-    // Safety check: ensure observations is an array
+  // Simple validation - server already filtered and sorted
+  const validObservations = useMemo(() => {
     if (!Array.isArray(observations)) {
       console.warn("FeedView: observations is not an array", observations);
       return [];
     }
-
-    try {
-      const filtered = applyFilters(observations, filters);
-      
-      // Filter out invalid observations first
-      const validObservations = filtered.filter((obs) => {
-        return (
-          obs &&
-          typeof obs === "object" &&
-          typeof obs.lat === "number" &&
-          typeof obs.lng === "number" &&
-          isFinite(obs.lat) &&
-          isFinite(obs.lng) &&
-          !isNaN(obs.lat) &&
-          !isNaN(obs.lng)
-        );
-      });
-
-      // Check if observations already have server-calculated distances
-      // Use server distances if ANY observation has them (mixed is okay, we'll handle it)
-      const hasServerDistances = validObservations.length > 0 && 
-        validObservations.some(obs => obs.distance !== undefined);
-
-      if (hasServerDistances) {
-        // Use server-calculated distances where available, calculate client-side for missing ones
-        // This handles the case where some observations have server distances and some don't
-        const withDistances = validObservations.map((obs) => {
-          // If observation already has distance/bearing from server, use it
-          if (obs.distance !== undefined || obs.bearing !== undefined) {
-            return {
-              observation: obs,
-              distance: obs.distance ?? null,
-              bearing: obs.bearing ?? null,
-            };
-          }
-          
-          // Otherwise, calculate client-side if userLocation is available
-          if (userLocation && 
-              typeof userLocation.latitude === "number" &&
-              typeof userLocation.longitude === "number" &&
-              isFinite(userLocation.latitude) &&
-              isFinite(userLocation.longitude)) {
-            try {
-              const dist = distanceKm(
-                userLocation.latitude,
-                userLocation.longitude,
-                obs.lat,
-                obs.lng
-              );
-              const bear = bearing(
-                userLocation.latitude,
-                userLocation.longitude,
-                obs.lat,
-                obs.lng
-              );
-              return {
-                observation: obs,
-                distance: isNaN(dist) || !isFinite(dist) ? null : dist,
-                bearing: isNaN(bear) || !isFinite(bear) ? null : bear,
-              };
-            } catch (error) {
-              console.error("Error calculating distance/bearing for observation:", obs.id, error);
-              return {
-                observation: obs,
-                distance: null,
-                bearing: null,
-              };
-            }
-          }
-          
-          // No user location, no distance
-          return {
-            observation: obs,
-            distance: null,
-            bearing: null,
-          };
-        });
-
-        // Sort by distance (closest first)
-        return withDistances.sort((a, b) => {
-          // If either distance is null, put it at the end
-          if (a.distance === null && b.distance === null) return 0;
-          if (a.distance === null) return 1;
-          if (b.distance === null) return -1;
-          return a.distance - b.distance;
-        });
-      }
-
-      // Fallback to client-side calculation if server didn't provide distances
-      if (!userLocation) {
-        // Return observations without distance when user location is not available
-        return validObservations.map((obs) => ({
-          observation: obs,
-          distance: null as number | null,
-          bearing: null as number | null,
-        }));
-      }
-
-      // Validate userLocation
-      if (
-        typeof userLocation.latitude !== "number" ||
-        typeof userLocation.longitude !== "number" ||
-        !isFinite(userLocation.latitude) ||
-        !isFinite(userLocation.longitude) ||
-        isNaN(userLocation.latitude) ||
-        isNaN(userLocation.longitude)
-      ) {
-        console.warn("FeedView: Invalid userLocation", userLocation);
-        return validObservations.map((obs) => ({
-          observation: obs,
-          distance: null as number | null,
-          bearing: null as number | null,
-        }));
-      }
-
-      // Calculate distance and bearing client-side (fallback)
-      const withDistance = validObservations.map((obs) => {
-        try {
-          const dist = distanceKm(
-            userLocation.latitude,
-            userLocation.longitude,
-            obs.lat,
-            obs.lng
-          );
-          const bear = bearing(
-            userLocation.latitude,
-            userLocation.longitude,
-            obs.lat,
-            obs.lng
-          );
-          return {
-            observation: obs,
-            distance: isNaN(dist) || !isFinite(dist) ? null : dist,
-            bearing: isNaN(bear) || !isFinite(bear) ? null : bear,
-          };
-        } catch (error) {
-          console.error("Error calculating distance/bearing:", error);
-          return {
-            observation: obs,
-            distance: null as number | null,
-            bearing: null as number | null,
-          };
-        }
-      });
-
-      return withDistance.sort((a, b) => {
-        // If either distance is null, put it at the end
-        if (a.distance === null && b.distance === null) return 0;
-        if (a.distance === null) return 1;
-        if (b.distance === null) return -1;
-        return a.distance - b.distance;
-      });
-    } catch (error) {
-      console.error("Error in filteredAndSorted useMemo:", error);
-      return [];
-    }
-  }, [observations, filters, userLocation]);
+    // Server already validated and filtered - trust it
+    return observations;
+  }, [observations]);
 
   // Feed background should be slightly darker than card background
   const feedBackgroundColor = theme.background.primary === "#FFFFFF"
     ? "#F5F5F5" // Slightly darker than white
     : "#0A0A0A"; // Slightly lighter than black
 
-  if (isLoading && filteredAndSorted.length === 0) {
+  if (isLoading && validObservations.length === 0) {
     return (
       <View style={[styles.container, styles.centerContent, { backgroundColor: feedBackgroundColor }]}>
         <ActivityIndicator size="large" color={theme.text.primary} />
@@ -409,13 +203,11 @@ export const FeedView: React.FC<FeedViewProps> = ({
     );
   }
 
-  if (filteredAndSorted.length === 0) {
+  if (validObservations.length === 0) {
     return (
       <View style={[styles.container, styles.centerContent, { backgroundColor: feedBackgroundColor }]}>
         <Text style={[styles.emptyText, { color: theme.text.secondary }]} allowFontScaling={true}>
-          {countActiveFilters(filters) > 0
-            ? "No observations match your filters"
-            : "No observations found"}
+          No observations found
         </Text>
       </View>
     );
@@ -424,22 +216,8 @@ export const FeedView: React.FC<FeedViewProps> = ({
   // Handle scroll to detect when near end
   const handleEndReached = () => {
     try {
-      if (
-        !isLoadingMore &&
-        !isLoading &&
-        userLocation &&
-        onLoadMore &&
-        typeof onLoadMore === "function"
-      ) {
-        // Validate userLocation before calling
-        if (
-          typeof userLocation.latitude === "number" &&
-          typeof userLocation.longitude === "number" &&
-          isFinite(userLocation.latitude) &&
-          isFinite(userLocation.longitude)
-        ) {
-          onLoadMore();
-        }
+      if (!isLoadingMore && !isLoading && onLoadMore && typeof onLoadMore === "function") {
+        onLoadMore();
       }
     } catch (error) {
       console.error("Error in handleEndReached:", error);
@@ -459,54 +237,22 @@ export const FeedView: React.FC<FeedViewProps> = ({
     );
   };
 
-  // Safety check before rendering
-  if (!Array.isArray(filteredAndSorted)) {
-    console.warn("FeedView: filteredAndSorted is not an array");
-    return (
-      <View style={[styles.container, styles.centerContent, { backgroundColor: feedBackgroundColor }]}>
-        <Text style={[styles.emptyText, { color: theme.text.secondary }]} allowFontScaling={true}>
-          Unable to load observations
-        </Text>
-      </View>
-    );
-  }
-
   return (
     <View style={[styles.container, { backgroundColor: feedBackgroundColor }]} pointerEvents="auto">
       <FlatList
-        data={filteredAndSorted}
+        data={validObservations}
         keyExtractor={(item, index) => {
-          // Safety check for item structure
-          if (!item || !item.observation) {
-            console.warn("FeedView: Invalid item in filteredAndSorted", item);
-            return `invalid-${index}`;
-          }
-          // Use ID if available, otherwise use index as fallback
-          const id = item.observation.id;
-          if (id && typeof id === "string" && id.length > 0) {
-            return id;
-          }
-          return `obs-${index}`;
+          // Simple key extraction - server ensures IDs exist
+          return item?.id || `obs-${index}`;
         }}
-        renderItem={({ item, index }) => {
-          // Safety check before rendering item
-          if (!item || !item.observation) {
-            console.warn("FeedView: Invalid item in renderItem", item);
-            return <View key={`empty-${index}`} style={{ height: 0 }} />;
-          }
-          
-          // Additional validation for observation properties
-          if (typeof item.observation.lat !== "number" || typeof item.observation.lng !== "number") {
-            console.warn("FeedView: Observation missing coordinates", item.observation);
-            return <View key={`invalid-coords-${index}`} style={{ height: 0 }} />;
-          }
-          
+        renderItem={({ item }) => {
+          // Server already validated - trust it
           return (
             <FeedItem
-              observation={item.observation}
-              distance={item.distance}
-              bearing={item.bearing}
-              onPress={() => handleObservationPress(item.observation)}
+              observation={item}
+              distance={item.distance ?? null}
+              bearing={item.bearing ?? null}
+              onPress={() => handleObservationPress(item)}
               theme={theme}
             />
           );
