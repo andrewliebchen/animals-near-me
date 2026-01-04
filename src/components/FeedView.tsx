@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from "react";
+import React, { useMemo, useCallback, useState } from "react";
 import {
   View,
   Text,
@@ -72,6 +72,7 @@ interface FeedItemProps {
 const FeedItem: React.FC<FeedItemProps> = ({ observation, distance, bearing: bearingDeg, onPress, theme }) => {
   const color = getTaxaColor(observation.taxaBucket);
   const providerName = observation.provider === "ebird" ? "eBird" : "iNaturalist";
+  const [imageError, setImageError] = useState(false);
 
   const handlePress = () => {
     onPress();
@@ -98,11 +99,15 @@ const FeedItem: React.FC<FeedItemProps> = ({ observation, distance, bearing: bea
       onPress={handlePress}
       activeOpacity={0.7}
     >
-      {observation.photoUrl ? (
+      {observation.photoUrl && !imageError ? (
         <Image
           source={{ uri: observation.photoUrl }}
           style={styles.thumbnail}
           resizeMode="cover"
+          onError={() => {
+            console.warn("Failed to load image:", observation.photoUrl);
+            setImageError(true);
+          }}
         />
       ) : (
         <View style={[styles.thumbnail, styles.thumbnailPlaceholder, { backgroundColor: theme.background.secondary }]}>
