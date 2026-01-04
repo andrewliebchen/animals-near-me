@@ -202,6 +202,7 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
       snapPoints={snapPoints}
       enablePanDownToClose
       onClose={onClose}
+      onChange={() => {}}
       enableDynamicSizing={false}
       handleIndicatorStyle={{ backgroundColor: theme.border, width: 80 }}
       backgroundStyle={{ backgroundColor: theme.background.card }}

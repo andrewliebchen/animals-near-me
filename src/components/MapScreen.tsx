@@ -100,6 +100,7 @@ export const MapScreen: React.FC = () => {
     resetFeedRadius,
   } = useObservationStore();
 
+
   const mapRef = useRef<any>(null);
   const initialRegionRef = useRef<Region | null>(null);
   const [showLegend, setShowLegend] = useState(false);
@@ -115,8 +116,14 @@ export const MapScreen: React.FC = () => {
   }, [activeView, resetFeedRadius]);
 
   // Close detail card when switching to feed view with animation
+  // Use a ref to track previous activeView to only close when actually switching
+  const previousActiveViewRef = useRef<"map" | "feed">(activeView);
   useEffect(() => {
-    if (activeView === "feed" && selectedObservation) {
+    const previousView = previousActiveViewRef.current;
+    previousActiveViewRef.current = activeView;
+    
+    // Only close if we're switching TO feed view (not if we're already in feed view)
+    if (activeView === "feed" && previousView === "map" && selectedObservation) {
       // Close the observation sheet first to allow animation
       // The ObservationSheet will handle the close animation when observation becomes null
       setSelectedObservation(null);
@@ -129,8 +136,10 @@ export const MapScreen: React.FC = () => {
       // Reset ready state and start delay timer
       setFeedViewReady(false);
       
-      // If we have user location and viewport, fetch observations with user location
-      if (userLocation && viewport) {
+      // Only fetch if we don't already have observations or if we have user location to improve sorting
+      // Don't refetch on every render - only when actually switching to feed view
+      const shouldFetch = userLocation && viewport && observations.length === 0;
+      if (shouldFetch) {
         fetchObservationsForViewport(viewport, userLocation);
       }
       
@@ -145,7 +154,9 @@ export const MapScreen: React.FC = () => {
       // Immediately set to false when switching away from feed
       setFeedViewReady(false);
     }
-  }, [activeView, userLocation, viewport, fetchObservationsForViewport]);
+    // Only depend on activeView - don't refetch when other things change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeView]);
   const isZoomingIntoClusterRef = useRef(false);
   const lastCenteredObservationIdRef = useRef<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -679,7 +690,7 @@ export const MapScreen: React.FC = () => {
 
       {/* Feed View */}
       {activeView === "feed" && (
-        <>
+        <View style={styles.feedViewContainer}>
           {feedViewReady ? (
             <FeedView
               observations={observations}
@@ -700,9 +711,10 @@ export const MapScreen: React.FC = () => {
             </View>
           )}
           {error && <ErrorState error={error} onRetry={handleRetry} />}
-        </>
+        </View>
       )}
 
+      {/* ObservationSheet - always rendered to receive updates */}
       <ObservationSheet
         observation={selectedObservation}
         onClose={() => setSelectedObservation(null)}
@@ -828,6 +840,17 @@ const styles = StyleSheet.create({
   },
   feedContainer: {
     flex: 1,
+  },
+  feedViewContainer: {
+    flex: 1,
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 0, // Lower z-index to allow BottomSheet components to render above
+    // BottomSheet components render in portals and should appear above this
+    // pointerEvents: "box-none" allows touches to pass through to BottomSheet components
   },
 });
 

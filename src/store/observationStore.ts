@@ -176,15 +176,17 @@ export const useObservationStore = create<ObservationState>()(
           }
           
           // Merge with existing observations
+          // When merging, prefer new observations (they have fresh distance/bearing calculations)
           const existingObservations = currentState.observations;
           const observationMap = new Map<string, Observation>();
           
-          // Add existing observations to map
+          // Add existing observations to map first
           existingObservations.forEach(obs => {
             observationMap.set(obs.id, obs);
           });
           
-          // Add/update with new observations
+          // Add/update with new observations (these will overwrite existing ones with fresh data)
+          // New observations should have distance/bearing if userLocation was provided
           newObservations.forEach(obs => {
             observationMap.set(obs.id, obs);
           });

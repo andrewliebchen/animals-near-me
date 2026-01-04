@@ -34,9 +34,10 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
   onShowOnMap,
 }) => {
   const theme = useTheme();
-  const snapPoints = useMemo(() => ["40%", "90%"], []);
+  const snapPoints = useMemo(() => ["50%", "90%"], []);
   const sheetRef = React.useRef<BottomSheet | null>(null);
   const [isSheetReady, setIsSheetReady] = useState(false);
+  
   
   const [wikipediaData, setWikipediaData] = useState<WikipediaSummary | null>(null);
   const [wikipediaLoading, setWikipediaLoading] = useState(false);
@@ -373,7 +374,7 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
           <TouchableOpacity
             style={dynamicStyles.linkButton}
             onPress={() => {
-              // Collapse to smallest snap point (index 0 = 40%)
+              // Collapse to smallest snap point (index 0 = 50%)
               if (sheetRef.current) {
                 sheetRef.current.snapToIndex(0);
               }

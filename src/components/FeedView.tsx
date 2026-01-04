@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useCallback } from "react";
 import {
   View,
   Text,
@@ -122,6 +122,10 @@ const FeedItem: React.FC<FeedItemProps> = ({ observation, distance, bearing: bea
   const color = getTaxaColor(observation.taxaBucket);
   const providerName = observation.provider === "ebird" ? "eBird" : "iNaturalist";
 
+  const handlePress = () => {
+    onPress();
+  };
+
   const formatDate = (dateString?: string) => {
     if (!dateString) return "Unknown";
     try {
@@ -140,7 +144,7 @@ const FeedItem: React.FC<FeedItemProps> = ({ observation, distance, bearing: bea
   return (
     <TouchableOpacity
       style={[styles.feedItem, { backgroundColor: theme.background.card }]}
-      onPress={onPress}
+      onPress={handlePress}
       activeOpacity={0.7}
     >
       {observation.photoUrl ? (
@@ -213,6 +217,17 @@ export const FeedView: React.FC<FeedViewProps> = ({
 }) => {
   const theme = useTheme();
 
+  // Memoize the press handler to prevent unnecessary re-renders
+  const handleObservationPress = useCallback((observation: Observation) => {
+    try {
+      if (onObservationPress && typeof onObservationPress === "function") {
+        onObservationPress(observation);
+      }
+    } catch (error) {
+      console.error("Error in onObservationPress:", error);
+    }
+  }, [onObservationPress]);
+
   // Apply filters and sort by distance
   const filteredAndSorted = useMemo(() => {
     // Safety check: ensure observations is an array
@@ -239,16 +254,73 @@ export const FeedView: React.FC<FeedViewProps> = ({
       });
 
       // Check if observations already have server-calculated distances
+      // Use server distances if ANY observation has them (mixed is okay, we'll handle it)
       const hasServerDistances = validObservations.length > 0 && 
         validObservations.some(obs => obs.distance !== undefined);
 
       if (hasServerDistances) {
-        // Use server-calculated distances - already sorted by server
-        return validObservations.map((obs) => ({
-          observation: obs,
-          distance: obs.distance ?? null,
-          bearing: obs.bearing ?? null,
-        }));
+        // Use server-calculated distances where available, calculate client-side for missing ones
+        // This handles the case where some observations have server distances and some don't
+        const withDistances = validObservations.map((obs) => {
+          // If observation already has distance/bearing from server, use it
+          if (obs.distance !== undefined || obs.bearing !== undefined) {
+            return {
+              observation: obs,
+              distance: obs.distance ?? null,
+              bearing: obs.bearing ?? null,
+            };
+          }
+          
+          // Otherwise, calculate client-side if userLocation is available
+          if (userLocation && 
+              typeof userLocation.latitude === "number" &&
+              typeof userLocation.longitude === "number" &&
+              isFinite(userLocation.latitude) &&
+              isFinite(userLocation.longitude)) {
+            try {
+              const dist = distanceKm(
+                userLocation.latitude,
+                userLocation.longitude,
+                obs.lat,
+                obs.lng
+              );
+              const bear = bearing(
+                userLocation.latitude,
+                userLocation.longitude,
+                obs.lat,
+                obs.lng
+              );
+              return {
+                observation: obs,
+                distance: isNaN(dist) || !isFinite(dist) ? null : dist,
+                bearing: isNaN(bear) || !isFinite(bear) ? null : bear,
+              };
+            } catch (error) {
+              console.error("Error calculating distance/bearing for observation:", obs.id, error);
+              return {
+                observation: obs,
+                distance: null,
+                bearing: null,
+              };
+            }
+          }
+          
+          // No user location, no distance
+          return {
+            observation: obs,
+            distance: null,
+            bearing: null,
+          };
+        });
+
+        // Sort by distance (closest first)
+        return withDistances.sort((a, b) => {
+          // If either distance is null, put it at the end
+          if (a.distance === null && b.distance === null) return 0;
+          if (a.distance === null) return 1;
+          if (b.distance === null) return -1;
+          return a.distance - b.distance;
+        });
       }
 
       // Fallback to client-side calculation if server didn't provide distances
@@ -400,7 +472,7 @@ export const FeedView: React.FC<FeedViewProps> = ({
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: feedBackgroundColor }]}>
+    <View style={[styles.container, { backgroundColor: feedBackgroundColor }]} pointerEvents="auto">
       <FlatList
         data={filteredAndSorted}
         keyExtractor={(item, index) => {
@@ -434,15 +506,7 @@ export const FeedView: React.FC<FeedViewProps> = ({
               observation={item.observation}
               distance={item.distance}
               bearing={item.bearing}
-              onPress={() => {
-                try {
-                  if (onObservationPress && typeof onObservationPress === "function") {
-                    onObservationPress(item.observation);
-                  }
-                } catch (error) {
-                  console.error("Error in onObservationPress:", error);
-                }
-              }}
+              onPress={() => handleObservationPress(item.observation)}
               theme={theme}
             />
           );

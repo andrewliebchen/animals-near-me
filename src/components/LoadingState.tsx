@@ -35,7 +35,7 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
 const styles = StyleSheet.create({
   container: {
     position: "absolute",
-    bottom: 80,
+    bottom: 60,
     alignSelf: "center",
     flexDirection: "row",
     alignItems: "center",
