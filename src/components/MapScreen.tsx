@@ -115,17 +115,10 @@ export const MapScreen: React.FC = () => {
     }
   }, [activeView, resetFeedRadius]);
 
-  // Close detail card when switching to feed view with animation
-  // Use a ref to track previous activeView to only close when actually switching
-  const previousActiveViewRef = useRef<"map" | "feed">(activeView);
+  // Clear selected observation when switching to feed view
+  // We conditionally render ObservationSheet only in map view to avoid Reanimated conflicts
   useEffect(() => {
-    const previousView = previousActiveViewRef.current;
-    previousActiveViewRef.current = activeView;
-    
-    // Only close if we're switching TO feed view (not if we're already in feed view)
-    if (activeView === "feed" && previousView === "map" && selectedObservation) {
-      // Close the observation sheet first to allow animation
-      // The ObservationSheet will handle the close animation when observation becomes null
+    if (activeView === "feed" && selectedObservation) {
       setSelectedObservation(null);
     }
   }, [activeView, selectedObservation, setSelectedObservation]);
@@ -136,15 +129,16 @@ export const MapScreen: React.FC = () => {
       // Reset ready state and start delay timer
       setFeedViewReady(false);
       
-      // Defer fetch to allow BottomSheet close animation to complete
-      // This prevents conflicts with React Native Reanimated during view transitions
+      // Since ObservationSheet is conditionally rendered (only in map view),
+      // we don't need to wait for it to close. Fetch immediately with a small delay
+      // for UI to settle.
       const fetchTimer = setTimeout(() => {
         // Always refetch with userLocation when switching to feed view to ensure distance/bearing are calculated
         // Feed view needs distance/bearing for sorting and display
         if (userLocation && viewport) {
           fetchObservationsForViewport(viewport, userLocation);
         }
-      }, 400); // 400ms delay to allow BottomSheet close animation to complete
+      }, 150); // Small delay for UI to settle
       
       const readyTimer = setTimeout(() => {
         setFeedViewReady(true);
@@ -731,47 +725,45 @@ export const MapScreen: React.FC = () => {
         </View>
       )}
 
-      {/* ObservationSheet - always rendered to receive updates */}
-      <ObservationSheet
-        observation={selectedObservation}
-        onClose={() => setSelectedObservation(null)}
-        onShowOnMap={
-          selectedObservation
-            ? () => {
-                // Switch to map view if in feed view
-                if (activeView === "feed") {
-                  setActiveView("map");
+      {/* ObservationSheet - only render in map view to avoid Reanimated conflicts during view transitions */}
+      {activeView === "map" && (
+        <ObservationSheet
+          observation={selectedObservation}
+          onClose={() => setSelectedObservation(null)}
+          onShowOnMap={
+            selectedObservation
+              ? () => {
+                  // Center map on observation
+                  if (mapRef.current && selectedObservation) {
+                    // Set flag to prevent refetching when centering on observation
+                    isZoomingIntoClusterRef.current = true;
+
+                    // Adjust center point to position marker higher on screen (accounting for bottom sheet)
+                    const currentViewport = viewport || DEFAULT_REGION;
+                    const verticalOffset = currentViewport.latitudeDelta * 0.15;
+                    const adjustedLatitude = selectedObservation.lat - verticalOffset;
+
+                    // Animate to the adjusted coordinate with a reasonable zoom level
+                    mapRef.current.animateToRegion(
+                      {
+                        latitude: adjustedLatitude,
+                        longitude: selectedObservation.lng,
+                        latitudeDelta: 0.01,
+                        longitudeDelta: 0.01,
+                      },
+                      500
+                    );
+
+                    // Reset the flag after animation completes
+                    setTimeout(() => {
+                      isZoomingIntoClusterRef.current = false;
+                    }, 1000);
+                  }
                 }
-                // Center map on observation
-                if (mapRef.current && selectedObservation) {
-                  // Set flag to prevent refetching when centering on observation
-                  isZoomingIntoClusterRef.current = true;
-
-                  // Adjust center point to position marker higher on screen (accounting for bottom sheet)
-                  const currentViewport = viewport || DEFAULT_REGION;
-                  const verticalOffset = currentViewport.latitudeDelta * 0.15;
-                  const adjustedLatitude = selectedObservation.lat - verticalOffset;
-
-                  // Animate to the adjusted coordinate with a reasonable zoom level
-                  mapRef.current.animateToRegion(
-                    {
-                      latitude: adjustedLatitude,
-                      longitude: selectedObservation.lng,
-                      latitudeDelta: 0.01,
-                      longitudeDelta: 0.01,
-                    },
-                    500
-                  );
-
-                  // Reset the flag after animation completes
-                  setTimeout(() => {
-                    isZoomingIntoClusterRef.current = false;
-                  }, 1000);
-                }
-              }
-            : undefined
-        }
-      />
+              : undefined
+          }
+        />
+      )}
 
       <FilterSheet
         visible={showFilterSheet}

@@ -93,25 +93,39 @@ export const useObservationStore = create<ObservationState>()(
             return;
           }
           
-          // When userLocation is provided, prefer new observations (they have distance/bearing)
+          // When userLocation is provided, replace observations to maintain server-side sorting
           // When userLocation is not provided, merge to preserve cluster counts when zooming
           const existingObservations = get().observations;
-          const observationMap = new Map<string, Observation>();
+          let mergedObservations: Observation[];
           
           if (userLocation) {
-            // For feed view: prefer new observations (they have distance/bearing calculated)
-            // Add new observations first
+            // For feed view: replace with new observations to maintain distance-based sorting
+            // The server has already sorted by distance, so we should preserve that order
+            const observationMap = new Map<string, Observation>();
+            
+            // Add new observations first (they're already sorted by distance from server)
             newObservations.forEach(obs => {
               observationMap.set(obs.id, obs);
             });
+            
             // Only add existing observations that aren't in the new set (for continuity)
+            // But we need to re-sort to maintain distance order
             existingObservations.forEach(obs => {
               if (!observationMap.has(obs.id)) {
                 observationMap.set(obs.id, obs);
               }
             });
+            
+            // Convert to array and re-sort by distance to maintain correct order
+            mergedObservations = Array.from(observationMap.values());
+            mergedObservations.sort((a, b) => {
+              const distA = a.distance ?? Infinity;
+              const distB = b.distance ?? Infinity;
+              return distA - distB;
+            });
           } else {
             // For map view: merge to preserve cluster counts when zooming
+            const observationMap = new Map<string, Observation>();
             // Add existing observations to map
             existingObservations.forEach(obs => {
               observationMap.set(obs.id, obs);
@@ -120,10 +134,9 @@ export const useObservationStore = create<ObservationState>()(
             newObservations.forEach(obs => {
               observationMap.set(obs.id, obs);
             });
+            // Convert back to array (order doesn't matter for map view)
+            mergedObservations = Array.from(observationMap.values());
           }
-          
-          // Convert back to array
-          const mergedObservations = Array.from(observationMap.values());
           
           set({ observations: mergedObservations, viewport, isLoading: false });
         } catch (error) {
@@ -189,8 +202,8 @@ export const useObservationStore = create<ObservationState>()(
             return;
           }
           
-          // Merge with existing observations
-          // When merging, prefer new observations (they have fresh distance/bearing calculations)
+          // Merge with existing observations and re-sort by distance
+          // New observations have fresh distance/bearing calculations and are already sorted
           const existingObservations = currentState.observations;
           const observationMap = new Map<string, Observation>();
           
@@ -205,8 +218,13 @@ export const useObservationStore = create<ObservationState>()(
             observationMap.set(obs.id, obs);
           });
           
-          // Convert back to array
+          // Convert back to array and re-sort by distance to maintain correct order
           const mergedObservations = Array.from(observationMap.values());
+          mergedObservations.sort((a, b) => {
+            const distA = a.distance ?? Infinity;
+            const distB = b.distance ?? Infinity;
+            return distA - distB;
+          });
           
           set({ 
             observations: mergedObservations, 
