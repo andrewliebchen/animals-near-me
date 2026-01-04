@@ -93,20 +93,34 @@ export const useObservationStore = create<ObservationState>()(
             return;
           }
           
-          // Merge with existing observations instead of replacing
-          // This ensures cluster counts remain accurate when zooming
+          // When userLocation is provided, prefer new observations (they have distance/bearing)
+          // When userLocation is not provided, merge to preserve cluster counts when zooming
           const existingObservations = get().observations;
           const observationMap = new Map<string, Observation>();
           
-          // Add existing observations to map
-          existingObservations.forEach(obs => {
-            observationMap.set(obs.id, obs);
-          });
-          
-          // Add/update with new observations
-          newObservations.forEach(obs => {
-            observationMap.set(obs.id, obs);
-          });
+          if (userLocation) {
+            // For feed view: prefer new observations (they have distance/bearing calculated)
+            // Add new observations first
+            newObservations.forEach(obs => {
+              observationMap.set(obs.id, obs);
+            });
+            // Only add existing observations that aren't in the new set (for continuity)
+            existingObservations.forEach(obs => {
+              if (!observationMap.has(obs.id)) {
+                observationMap.set(obs.id, obs);
+              }
+            });
+          } else {
+            // For map view: merge to preserve cluster counts when zooming
+            // Add existing observations to map
+            existingObservations.forEach(obs => {
+              observationMap.set(obs.id, obs);
+            });
+            // Add/update with new observations
+            newObservations.forEach(obs => {
+              observationMap.set(obs.id, obs);
+            });
+          }
           
           // Convert back to array
           const mergedObservations = Array.from(observationMap.values());

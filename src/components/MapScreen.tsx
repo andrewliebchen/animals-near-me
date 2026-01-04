@@ -136,10 +136,9 @@ export const MapScreen: React.FC = () => {
       // Reset ready state and start delay timer
       setFeedViewReady(false);
       
-      // Only fetch if we don't already have observations or if we have user location to improve sorting
-      // Don't refetch on every render - only when actually switching to feed view
-      const shouldFetch = userLocation && viewport && observations.length === 0;
-      if (shouldFetch) {
+      // Always refetch with userLocation when switching to feed view to ensure distance/bearing are calculated
+      // Feed view needs distance/bearing for sorting and display
+      if (userLocation && viewport) {
         fetchObservationsForViewport(viewport, userLocation);
       }
       
@@ -286,12 +285,16 @@ export const MapScreen: React.FC = () => {
     [debouncedFetch, setViewport]
   );
 
-  // Get user location
+  // Get user location and fetch initial observations
   useEffect(() => {
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") {
+          // Permission denied - fetch without location
+          if (!viewport) {
+            fetchObservationsForViewport(DEFAULT_REGION);
+          }
           return;
         }
 
@@ -299,21 +302,32 @@ export const MapScreen: React.FC = () => {
         const location = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.Balanced,
         });
-        setUserLocation({
+        const coords = {
           latitude: location.coords.latitude,
           longitude: location.coords.longitude,
-        });
+        };
+        setUserLocation(coords);
+
+        // Fetch initial observations WITH userLocation for distance/bearing calculation
+        if (!viewport) {
+          // Use user's location as the initial viewport center
+          const initialViewport: Region = {
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+            latitudeDelta: DEFAULT_REGION.latitudeDelta,
+            longitudeDelta: DEFAULT_REGION.longitudeDelta,
+          };
+          fetchObservationsForViewport(initialViewport, coords);
+        }
       } catch (error) {
         console.error("Error getting user location:", error);
+        // If location fails, still fetch observations without location
+        if (!viewport) {
+          fetchObservationsForViewport(DEFAULT_REGION);
+        }
       }
     })();
-  }, []);
-
-  // Initial fetch on mount
-  useEffect(() => {
-    if (!viewport) {
-      fetchObservationsForViewport(DEFAULT_REGION);
-    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleDeepLink = useCallback(async (url: string) => {

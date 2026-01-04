@@ -69,29 +69,24 @@ interface FeedItemProps {
   theme: ReturnType<typeof useTheme>;
 }
 
-const FeedItem: React.FC<FeedItemProps> = ({ observation, distance, bearing: bearingDeg, onPress, theme }) => {
+const FeedItem: React.FC<FeedItemProps> = React.memo<FeedItemProps>(({ observation, distance, bearing: bearingDeg, onPress, theme }) => {
   const color = getTaxaColor(observation.taxaBucket);
-  const providerName = observation.provider === "ebird" ? "eBird" : "iNaturalist";
   const [imageError, setImageError] = useState(false);
 
-  const handlePress = () => {
-    onPress();
-  };
+  // Debug logging
+  console.log("[FeedItem] Rendering:", {
+    id: observation.id,
+    distance,
+    bearing: bearingDeg,
+    distanceType: typeof distance,
+    bearingType: typeof bearingDeg,
+    willShowDistance: distance !== null,
+    willShowBearing: bearingDeg !== null && !isNaN(bearingDeg) && isFinite(bearingDeg),
+  });
 
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return "Unknown";
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch {
-      return dateString;
-    }
-  };
+  const handlePress = useCallback(() => {
+    onPress();
+  }, [onPress]);
 
   return (
     <TouchableOpacity
@@ -134,12 +129,12 @@ const FeedItem: React.FC<FeedItemProps> = ({ observation, distance, bearing: bea
             </View>
           </View>
         </View>
-        {distance !== null && (
+        {distance !== null && distance !== undefined ? (
           <View style={styles.distanceContainer}>
             <Text style={[styles.feedItemDistance, { color: theme.text.secondary }]} allowFontScaling={true}>
               {formatDistance(distance)}
             </Text>
-            {bearingDeg !== null && !isNaN(bearingDeg) && isFinite(bearingDeg) && (
+            {bearingDeg !== null && bearingDeg !== undefined && !isNaN(bearingDeg) && isFinite(bearingDeg) && (
               <>
                 <Ionicons
                   name="arrow-up-circle-outline"
@@ -156,11 +151,19 @@ const FeedItem: React.FC<FeedItemProps> = ({ observation, distance, bearing: bea
               </>
             )}
           </View>
-        )}
+        ) : null}
       </View>
     </TouchableOpacity>
   );
-};
+}, (prevProps, nextProps) => {
+  // Custom comparison function for React.memo
+  return (
+    prevProps.observation.id === nextProps.observation.id &&
+    prevProps.distance === nextProps.distance &&
+    prevProps.bearing === nextProps.bearing &&
+    prevProps.theme === nextProps.theme
+  );
+});
 
 export const FeedView: React.FC<FeedViewProps> = ({
   observations,
@@ -189,6 +192,19 @@ export const FeedView: React.FC<FeedViewProps> = ({
       return [];
     }
     // Server already validated and filtered - trust it
+    // Debug logging
+    if (observations.length > 0) {
+      console.log("[FeedView] validObservations sample:", {
+        count: observations.length,
+        firstObservation: {
+          id: observations[0]?.id,
+          hasDistance: observations[0]?.distance !== undefined,
+          distance: observations[0]?.distance,
+          hasBearing: observations[0]?.bearing !== undefined,
+          bearing: observations[0]?.bearing,
+        },
+      });
+    }
     return observations;
   }, [observations]);
 
@@ -197,6 +213,65 @@ export const FeedView: React.FC<FeedViewProps> = ({
     ? "#F5F5F5" // Slightly darker than white
     : "#0A0A0A"; // Slightly lighter than black
 
+  // Handle scroll to detect when near end
+  const handleEndReached = useCallback(() => {
+    try {
+      if (!isLoadingMore && !isLoading && onLoadMore && typeof onLoadMore === "function") {
+        onLoadMore();
+      }
+    } catch (error) {
+      console.error("Error in handleEndReached:", error);
+    }
+  }, [isLoadingMore, isLoading, onLoadMore]);
+
+  // Render footer with loading indicator
+  const renderFooter = useCallback(() => {
+    if (!isLoadingMore) return null;
+    return (
+      <View style={styles.footer}>
+        <ActivityIndicator size="small" color={theme.text.primary} />
+        <Text style={[styles.footerText, { color: theme.text.secondary }]} allowFontScaling={true}>
+          Loading more...
+        </Text>
+      </View>
+    );
+  }, [isLoadingMore, theme]);
+
+  // Memoize renderItem to prevent unnecessary re-renders
+  const renderItem = useCallback(({ item }: { item: Observation }) => {
+    const distance = item.distance ?? null;
+    const bearing = item.bearing ?? null;
+    
+    // Debug logging
+    if (validObservations.length > 0) {
+      console.log("[FeedView] Rendering item:", {
+        id: item.id,
+        hasDistance: item.distance !== undefined,
+        distance: item.distance,
+        distanceProp: distance,
+        hasBearing: item.bearing !== undefined,
+        bearing: item.bearing,
+        bearingProp: bearing,
+      });
+    }
+    
+    return (
+      <FeedItem
+        observation={item}
+        distance={distance}
+        bearing={bearing}
+        onPress={() => handleObservationPress(item)}
+        theme={theme}
+      />
+    );
+  }, [handleObservationPress, theme, validObservations.length]);
+
+  // Memoize keyExtractor
+  const keyExtractor = useCallback((item: Observation, index: number) => {
+    return item?.id || `obs-${index}`;
+  }, []);
+
+  // Early returns AFTER all hooks are called
   if (isLoading && validObservations.length === 0) {
     return (
       <View style={[styles.container, styles.centerContent, { backgroundColor: feedBackgroundColor }]}>
@@ -218,56 +293,22 @@ export const FeedView: React.FC<FeedViewProps> = ({
     );
   }
 
-  // Handle scroll to detect when near end
-  const handleEndReached = () => {
-    try {
-      if (!isLoadingMore && !isLoading && onLoadMore && typeof onLoadMore === "function") {
-        onLoadMore();
-      }
-    } catch (error) {
-      console.error("Error in handleEndReached:", error);
-    }
-  };
-
-  // Render footer with loading indicator
-  const renderFooter = () => {
-    if (!isLoadingMore) return null;
-    return (
-      <View style={styles.footer}>
-        <ActivityIndicator size="small" color={theme.text.primary} />
-        <Text style={[styles.footerText, { color: theme.text.secondary }]} allowFontScaling={true}>
-          Loading more...
-        </Text>
-      </View>
-    );
-  };
-
   return (
     <View style={[styles.container, { backgroundColor: feedBackgroundColor }]} pointerEvents="auto">
       <FlatList
         data={validObservations}
-        keyExtractor={(item, index) => {
-          // Simple key extraction - server ensures IDs exist
-          return item?.id || `obs-${index}`;
-        }}
-        renderItem={({ item }) => {
-          // Server already validated - trust it
-          return (
-            <FeedItem
-              observation={item}
-              distance={item.distance ?? null}
-              bearing={item.bearing ?? null}
-              onPress={() => handleObservationPress(item)}
-              theme={theme}
-            />
-          );
-        }}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         onEndReached={handleEndReached}
-        onEndReachedThreshold={0.5} // Trigger when 50% from bottom
+        onEndReachedThreshold={0.5}
         ListFooterComponent={renderFooter}
-        removeClippedSubviews={false} // Prevent rendering issues
+        removeClippedSubviews={false}
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        updateCellsBatchingPeriod={50}
       />
     </View>
   );
