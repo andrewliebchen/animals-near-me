@@ -11,11 +11,9 @@ import { ObservationMarker } from "./ObservationMarker";
 import { ClusterMarker } from "./ClusterMarker";
 import { DEFAULT_REGION } from "../utils/viewport";
 import { ObservationSheet } from "./ObservationSheet";
-import { LoadingState } from "./LoadingState";
 import { ErrorState } from "./ErrorState";
 import { ColorLegend } from "./ColorLegend";
 import { FilterSheet } from "./FilterSheet";
-import { FeedView } from "./FeedView";
 import { Header } from "./Header";
 import { countActiveFilters } from "../types/filters";
 import { useTheme } from "../utils/theme";
@@ -92,12 +90,10 @@ export const MapScreen: React.FC = () => {
     error,
     filters,
     fetchObservationsForViewport,
-    fetchMoreObservationsForFeed,
     setSelectedObservation,
     setViewport,
     setFilters,
     clearError,
-    resetFeedRadius,
   } = useObservationStore();
 
 
@@ -105,56 +101,6 @@ export const MapScreen: React.FC = () => {
   const initialRegionRef = useRef<Region | null>(null);
   const [showLegend, setShowLegend] = useState(false);
   const [showFilterSheet, setShowFilterSheet] = useState(false);
-  const [activeView, setActiveView] = useState<"map" | "feed">("map");
-  const [feedViewReady, setFeedViewReady] = useState(false);
-
-  // Reset feed radius when switching to map view
-  useEffect(() => {
-    if (activeView === "map") {
-      resetFeedRadius();
-    }
-  }, [activeView, resetFeedRadius]);
-
-  // Clear selected observation when switching to feed view
-  // We conditionally render ObservationSheet only in map view to avoid Reanimated conflicts
-  useEffect(() => {
-    if (activeView === "feed" && selectedObservation) {
-      setSelectedObservation(null);
-    }
-  }, [activeView, selectedObservation, setSelectedObservation]);
-
-  // Debounce feed view initialization to allow UI to settle
-  useEffect(() => {
-    if (activeView === "feed") {
-      // Reset ready state and start delay timer
-      setFeedViewReady(false);
-      
-      // Since ObservationSheet is conditionally rendered (only in map view),
-      // we don't need to wait for it to close. Fetch immediately with a small delay
-      // for UI to settle.
-      const fetchTimer = setTimeout(() => {
-        // Always refetch with userLocation when switching to feed view to ensure distance/bearing are calculated
-        // Feed view needs distance/bearing for sorting and display
-        if (userLocation && viewport) {
-          fetchObservationsForViewport(viewport, userLocation);
-        }
-      }, 150); // Small delay for UI to settle
-      
-      const readyTimer = setTimeout(() => {
-        setFeedViewReady(true);
-      }, 100); // 100ms delay for UI to settle
-
-      return () => {
-        clearTimeout(fetchTimer);
-        clearTimeout(readyTimer);
-      };
-    } else {
-      // Immediately set to false when switching away from feed
-      setFeedViewReady(false);
-    }
-    // Only depend on activeView - don't refetch when other things change
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeView]);
   const isZoomingIntoClusterRef = useRef(false);
   const lastCenteredObservationIdRef = useRef<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -595,15 +541,13 @@ export const MapScreen: React.FC = () => {
     <View style={styles.container}>
       {/* Header Component */}
       <Header
-        activeView={activeView}
-        onViewChange={setActiveView}
         filters={filters}
         onFilterPress={() => setShowFilterSheet(!showFilterSheet)}
-        showBackground={activeView === "feed"}
+        isLoading={isLoading}
       />
 
-      {/* Map View - Keep mounted to preserve state */}
-      <View style={activeView === "map" ? styles.mapContainer : styles.mapContainerHidden}>
+      {/* Map View */}
+      <View style={styles.mapContainer}>
         <ClusteredMapView
           ref={mapRef}
           style={styles.map}
@@ -642,13 +586,11 @@ export const MapScreen: React.FC = () => {
             ))}
           </ClusteredMapView>
 
-        {activeView === "map" && (
-          <>
-            {isLoading && <LoadingState />}
-            {error && <ErrorState error={error} onRetry={handleRetry} />}
-            <ColorLegend visible={showLegend} />
+        <>
+          {error && <ErrorState error={error} onRetry={handleRetry} />}
+          <ColorLegend visible={showLegend} />
 
-            {/* Filter Button - Map View */}
+          {/* Filter Button - Map View */}
             <TouchableOpacity
             style={[
               styles.filterButton,
@@ -697,37 +639,11 @@ export const MapScreen: React.FC = () => {
                 color={theme.text.primary}
               />
             </TouchableOpacity>
-          </>
-        )}
+        </>
       </View>
 
-      {/* Feed View */}
-      {activeView === "feed" && (
-        <View style={styles.feedViewContainer}>
-          {feedViewReady ? (
-            <FeedView
-              observations={observations}
-              onObservationPress={setSelectedObservation}
-              isLoading={isLoading}
-              isLoadingMore={isLoadingMore}
-              onLoadMore={() => {
-                if (userLocation) {
-                  fetchMoreObservationsForFeed(userLocation);
-                }
-              }}
-            />
-          ) : (
-            <View style={styles.feedContainer}>
-              <LoadingState />
-            </View>
-          )}
-          {error && <ErrorState error={error} onRetry={handleRetry} />}
-        </View>
-      )}
-
-      {/* ObservationSheet - only render in map view to avoid Reanimated conflicts during view transitions */}
-      {activeView === "map" && (
-        <ObservationSheet
+      {/* ObservationSheet */}
+      <ObservationSheet
           observation={selectedObservation}
           onClose={() => setSelectedObservation(null)}
           onShowOnMap={
@@ -763,7 +679,6 @@ export const MapScreen: React.FC = () => {
               : undefined
           }
         />
-      )}
 
       <FilterSheet
         visible={showFilterSheet}
@@ -786,17 +701,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-  },
-  mapContainerHidden: {
-    flex: 1,
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    opacity: 0,
-    pointerEvents: "none",
-    zIndex: -1, // Ensure it's behind other content
   },
   map: {
     flex: 1,
@@ -846,20 +750,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 4,
     elevation: 3,
-  },
-  feedContainer: {
-    flex: 1,
-  },
-  feedViewContainer: {
-    flex: 1,
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 0, // Lower z-index to allow BottomSheet components to render above
-    // BottomSheet components render in portals and should appear above this
-    // pointerEvents: "box-none" allows touches to pass through to BottomSheet components
   },
 });
 

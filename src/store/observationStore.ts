@@ -8,9 +8,8 @@ import { regionToViewportParams } from "../utils/viewport";
 import type { FilterParams } from "../types/filters";
 import { DEFAULT_FILTERS } from "../types/filters";
 
-// Module-level abort controllers for request cancellation
+// Module-level abort controller for request cancellation
 let viewportAbortController: AbortController | null = null;
-let feedAbortController: AbortController | null = null;
 
 interface ObservationState {
   observations: Observation[];
@@ -20,7 +19,6 @@ interface ObservationState {
   isLoadingMore: boolean;
   error: string | null;
   filters: FilterParams;
-  feedRadiusKm: number; // Current search radius for feed view
   
   // Actions
   setObservations: (observations: Observation[]) => void;
@@ -28,9 +26,7 @@ interface ObservationState {
   setViewport: (viewport: Region) => void;
   setFilters: (filters: FilterParams) => void;
   fetchObservationsForViewport: (viewport: Region, userLocation?: { latitude: number; longitude: number }) => Promise<void>;
-  fetchMoreObservationsForFeed: (userLocation: { latitude: number; longitude: number }) => Promise<void>;
   clearError: () => void;
-  resetFeedRadius: () => void;
 }
 
 export const useObservationStore = create<ObservationState>()(
@@ -43,7 +39,6 @@ export const useObservationStore = create<ObservationState>()(
       isLoadingMore: false,
       error: null,
       filters: DEFAULT_FILTERS,
-      feedRadiusKm: 5, // Start with 5km radius
 
       setObservations: (observations) => set({ observations }),
 
@@ -53,7 +48,7 @@ export const useObservationStore = create<ObservationState>()(
 
       setFilters: (filters: FilterParams) => {
         const currentFilters = get().filters;
-        set({ filters, feedRadiusKm: 5 }); // Reset radius when filters change
+        set({ filters });
         
         // If filters changed, clear observations and refetch for current viewport
         const filtersChanged = JSON.stringify(currentFilters) !== JSON.stringify(filters);
@@ -152,95 +147,6 @@ export const useObservationStore = create<ObservationState>()(
 
       clearError: () => set({ error: null }),
 
-      resetFeedRadius: () => set({ feedRadiusKm: 5 }),
-
-      fetchMoreObservationsForFeed: async (userLocation: { latitude: number; longitude: number }) => {
-        const currentState = get();
-        if (currentState.isLoadingMore || currentState.isLoading) {
-          return; // Don't fetch if already loading
-        }
-
-        // Cancel previous feed request if exists
-        if (feedAbortController) {
-          feedAbortController.abort();
-        }
-        
-        // Create new abort controller
-        feedAbortController = new AbortController();
-        const signal = feedAbortController.signal;
-
-        set({ isLoadingMore: true, error: null });
-        
-        try {
-          // Expand radius by 5km each time
-          const newRadius = currentState.feedRadiusKm + 5;
-          
-          // Create a viewport that represents the expanded search area
-          // Convert radius (km) to approximate degrees (1 degree ≈ 111 km)
-          const radiusDeg = newRadius / 111;
-          const expandedViewport: Region = {
-            latitude: userLocation.latitude,
-            longitude: userLocation.longitude,
-            latitudeDelta: radiusDeg * 2,
-            longitudeDelta: radiusDeg * 2,
-          };
-
-          const viewportParams = regionToViewportParams(expandedViewport);
-          const filters = currentState.filters;
-          const newObservations = await fetchObservations(
-            viewportParams, 
-            filters,
-            {
-              userLocation,
-              limit: 200, // Limit for feed view to prevent memory issues
-              signal,
-            }
-          );
-          
-          // Check if request was aborted
-          if (signal.aborted) {
-            return;
-          }
-          
-          // Merge with existing observations and re-sort by distance
-          // New observations have fresh distance/bearing calculations and are already sorted
-          const existingObservations = currentState.observations;
-          const observationMap = new Map<string, Observation>();
-          
-          // Add existing observations to map first
-          existingObservations.forEach(obs => {
-            observationMap.set(obs.id, obs);
-          });
-          
-          // Add/update with new observations (these will overwrite existing ones with fresh data)
-          // New observations should have distance/bearing if userLocation was provided
-          newObservations.forEach(obs => {
-            observationMap.set(obs.id, obs);
-          });
-          
-          // Convert back to array and re-sort by distance to maintain correct order
-          const mergedObservations = Array.from(observationMap.values());
-          mergedObservations.sort((a, b) => {
-            const distA = a.distance ?? Infinity;
-            const distB = b.distance ?? Infinity;
-            return distA - distB;
-          });
-          
-          set({ 
-            observations: mergedObservations, 
-            feedRadiusKm: newRadius,
-            isLoadingMore: false 
-          });
-        } catch (error) {
-          // Ignore abort errors
-          if (error instanceof Error && error.name === "AbortError") {
-            return;
-          }
-          const errorMessage = error instanceof Error ? error.message : "Failed to fetch more observations";
-          set({ error: errorMessage, isLoadingMore: false });
-          console.error("Error fetching more observations:", error);
-        }
-      },
     }),
     {
       name: "observation-filters-storage",
