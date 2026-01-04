@@ -136,18 +136,23 @@ export const MapScreen: React.FC = () => {
       // Reset ready state and start delay timer
       setFeedViewReady(false);
       
-      // Always refetch with userLocation when switching to feed view to ensure distance/bearing are calculated
-      // Feed view needs distance/bearing for sorting and display
-      if (userLocation && viewport) {
-        fetchObservationsForViewport(viewport, userLocation);
-      }
+      // Defer fetch to allow BottomSheet close animation to complete
+      // This prevents conflicts with React Native Reanimated during view transitions
+      const fetchTimer = setTimeout(() => {
+        // Always refetch with userLocation when switching to feed view to ensure distance/bearing are calculated
+        // Feed view needs distance/bearing for sorting and display
+        if (userLocation && viewport) {
+          fetchObservationsForViewport(viewport, userLocation);
+        }
+      }, 400); // 400ms delay to allow BottomSheet close animation to complete
       
-      const timer = setTimeout(() => {
+      const readyTimer = setTimeout(() => {
         setFeedViewReady(true);
-      }, 100); // 100ms delay
+      }, 100); // 100ms delay for UI to settle
 
       return () => {
-        clearTimeout(timer);
+        clearTimeout(fetchTimer);
+        clearTimeout(readyTimer);
       };
     } else {
       // Immediately set to false when switching away from feed

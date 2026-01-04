@@ -73,17 +73,6 @@ const FeedItem: React.FC<FeedItemProps> = React.memo<FeedItemProps>(({ observati
   const color = getTaxaColor(observation.taxaBucket);
   const [imageError, setImageError] = useState(false);
 
-  // Debug logging
-  console.log("[FeedItem] Rendering:", {
-    id: observation.id,
-    distance,
-    bearing: bearingDeg,
-    distanceType: typeof distance,
-    bearingType: typeof bearingDeg,
-    willShowDistance: distance !== null,
-    willShowBearing: bearingDeg !== null && !isNaN(bearingDeg) && isFinite(bearingDeg),
-  });
-
   const handlePress = useCallback(() => {
     onPress();
   }, [onPress]);
@@ -100,7 +89,6 @@ const FeedItem: React.FC<FeedItemProps> = React.memo<FeedItemProps>(({ observati
           style={styles.thumbnail}
           resizeMode="cover"
           onError={() => {
-            console.warn("Failed to load image:", observation.photoUrl);
             setImageError(true);
           }}
         />
@@ -176,35 +164,17 @@ export const FeedView: React.FC<FeedViewProps> = ({
 
   // Memoize the press handler to prevent unnecessary re-renders
   const handleObservationPress = useCallback((observation: Observation) => {
-    try {
-      if (onObservationPress && typeof onObservationPress === "function") {
-        onObservationPress(observation);
-      }
-    } catch (error) {
-      console.error("Error in onObservationPress:", error);
+    if (onObservationPress && typeof onObservationPress === "function") {
+      onObservationPress(observation);
     }
   }, [onObservationPress]);
 
   // Simple validation - server already filtered and sorted
   const validObservations = useMemo(() => {
     if (!Array.isArray(observations)) {
-      console.warn("FeedView: observations is not an array", observations);
       return [];
     }
     // Server already validated and filtered - trust it
-    // Debug logging
-    if (observations.length > 0) {
-      console.log("[FeedView] validObservations sample:", {
-        count: observations.length,
-        firstObservation: {
-          id: observations[0]?.id,
-          hasDistance: observations[0]?.distance !== undefined,
-          distance: observations[0]?.distance,
-          hasBearing: observations[0]?.bearing !== undefined,
-          bearing: observations[0]?.bearing,
-        },
-      });
-    }
     return observations;
   }, [observations]);
 
@@ -215,12 +185,8 @@ export const FeedView: React.FC<FeedViewProps> = ({
 
   // Handle scroll to detect when near end
   const handleEndReached = useCallback(() => {
-    try {
-      if (!isLoadingMore && !isLoading && onLoadMore && typeof onLoadMore === "function") {
-        onLoadMore();
-      }
-    } catch (error) {
-      console.error("Error in handleEndReached:", error);
+    if (!isLoadingMore && !isLoading && onLoadMore && typeof onLoadMore === "function") {
+      onLoadMore();
     }
   }, [isLoadingMore, isLoading, onLoadMore]);
 
@@ -242,19 +208,6 @@ export const FeedView: React.FC<FeedViewProps> = ({
     const distance = item.distance ?? null;
     const bearing = item.bearing ?? null;
     
-    // Debug logging
-    if (validObservations.length > 0) {
-      console.log("[FeedView] Rendering item:", {
-        id: item.id,
-        hasDistance: item.distance !== undefined,
-        distance: item.distance,
-        distanceProp: distance,
-        hasBearing: item.bearing !== undefined,
-        bearing: item.bearing,
-        bearingProp: bearing,
-      });
-    }
-    
     return (
       <FeedItem
         observation={item}
@@ -264,7 +217,7 @@ export const FeedView: React.FC<FeedViewProps> = ({
         theme={theme}
       />
     );
-  }, [handleObservationPress, theme, validObservations.length]);
+  }, [handleObservationPress, theme]);
 
   // Memoize keyExtractor
   const keyExtractor = useCallback((item: Observation, index: number) => {
