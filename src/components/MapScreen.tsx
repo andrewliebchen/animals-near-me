@@ -5,18 +5,21 @@ import ClusteredMapView from "react-native-map-clustering";
 import * as Location from "expo-location";
 import * as Linking from "expo-linking";
 import { Ionicons } from "@expo/vector-icons";
-import { useObservationStore } from "../store/observationStore";
-import { fetchObservationById } from "../api/client";
+import { fetchObservationById, fetchObservations } from "../api/client";
 import { ObservationMarker } from "./ObservationMarker";
 import { ClusterMarker } from "./ClusterMarker";
-import { DEFAULT_REGION } from "../utils/viewport";
+import { DEFAULT_REGION, regionToViewportParams } from "../utils/viewport";
 import { ObservationSheet } from "./ObservationSheet";
 import { ErrorState } from "./ErrorState";
 import { ColorLegend } from "./ColorLegend";
 import { FilterSheet } from "./FilterSheet";
 import { Header } from "./Header";
-import { countActiveFilters } from "../types/filters";
+import { countActiveFilters, DEFAULT_FILTERS, type FilterParams } from "../types/filters";
 import { useTheme } from "../utils/theme";
+import { useDeepLink } from "../context/DeepLinkContext";
+import type { Observation } from "../types/observation";
+import { loadFilters, saveFilters } from "../services/filters";
+import { getSeenObservationIds, markObservationAsSeen as markObservationAsSeenService } from "../services/seenObservations";
 
 // Custom map style to hide businesses but keep landmarks and parks
 const CUSTOM_MAP_STYLE = [
@@ -81,26 +84,21 @@ function useDebounce<T extends (...args: any[]) => void>(
 
 export const MapScreen: React.FC = () => {
   const theme = useTheme();
-  const {
-    observations,
-    selectedObservation,
-    viewport,
-    isLoading,
-    isLoadingMore,
-    error,
-    filters,
-    seenObservationIds,
-    fetchObservationsForViewport,
-    setSelectedObservation,
-    setViewport,
-    setFilters,
-    clearError,
-    loadFilters,
-    loadSeenObservations,
-    markObservationAsSeen,
-  } = useObservationStore();
+  const { deepLinkedObservation, setDeepLinkedObservation } = useDeepLink();
 
+  // State
+  const [observations, setObservations] = useState<Observation[]>([]);
+  const [selectedObservation, setSelectedObservation] = useState<Observation | null>(null);
+  const [viewport, setViewport] = useState<Region | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [filters, setFiltersState] = useState<FilterParams>(DEFAULT_FILTERS);
+  const [seenObservationIds, setSeenObservationIds] = useState<Set<string>>(new Set());
+  const [filtersLoaded, setFiltersLoaded] = useState(false);
+  const [seenObservationsLoaded, setSeenObservationsLoaded] = useState(false);
 
+  // Refs
   const mapRef = useRef<any>(null);
   const initialRegionRef = useRef<Region | null>(null);
   const [showLegend, setShowLegend] = useState(false);
@@ -108,12 +106,142 @@ export const MapScreen: React.FC = () => {
   const isZoomingIntoClusterRef = useRef(false);
   const lastCenteredObservationIdRef = useRef<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const viewportAbortControllerRef = useRef<AbortController | null>(null);
+
+  // Fetch observations for viewport
+  const fetchObservationsForViewport = useCallback(async (
+    region: Region,
+    userLocation?: { latitude: number; longitude: number }
+  ) => {
+    // Cancel previous request if exists
+    if (viewportAbortControllerRef.current) {
+      viewportAbortControllerRef.current.abort();
+    }
+    
+    // Create new abort controller
+    viewportAbortControllerRef.current = new AbortController();
+    const signal = viewportAbortControllerRef.current.signal;
+    
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const viewportParams = regionToViewportParams(region);
+      const newObservations = await fetchObservations(
+        viewportParams, 
+        filters,
+        {
+          userLocation,
+          limit: 1000, // Limit for map view
+          signal,
+        }
+      );
+      
+      // Check if request was aborted
+      if (signal.aborted) {
+        return;
+      }
+      
+      // When userLocation is provided, replace observations to maintain server-side sorting
+      // When userLocation is not provided, merge to preserve cluster counts when zooming
+      let mergedObservations: Observation[];
+      
+      if (userLocation) {
+        // For feed view: replace with new observations to maintain distance-based sorting
+        // The server has already sorted by distance, so we should preserve that order
+        const observationMap = new Map<string, Observation>();
+        
+        // Add new observations first (they're already sorted by distance from server)
+        newObservations.forEach(obs => {
+          observationMap.set(obs.id, obs);
+        });
+        
+        // Only add existing observations that aren't in the new set (for continuity)
+        // But we need to re-sort to maintain distance order
+        observations.forEach(obs => {
+          if (!observationMap.has(obs.id)) {
+            observationMap.set(obs.id, obs);
+          }
+        });
+        
+        // Convert to array and re-sort by distance to maintain correct order
+        mergedObservations = Array.from(observationMap.values());
+        mergedObservations.sort((a, b) => {
+          const distA = a.distance ?? Infinity;
+          const distB = b.distance ?? Infinity;
+          return distA - distB;
+        });
+      } else {
+        // For map view: merge to preserve cluster counts when zooming
+        const observationMap = new Map<string, Observation>();
+        // Add existing observations to map
+        observations.forEach(obs => {
+          observationMap.set(obs.id, obs);
+        });
+        // Add/update with new observations
+        newObservations.forEach(obs => {
+          observationMap.set(obs.id, obs);
+        });
+        // Convert back to array (order doesn't matter for map view)
+        mergedObservations = Array.from(observationMap.values());
+      }
+      
+      setObservations(mergedObservations);
+      setViewport(region);
+      setIsLoading(false);
+    } catch (error) {
+      // Ignore abort errors
+      if (error instanceof Error && error.name === "AbortError") {
+        return;
+      }
+      const errorMessage = error instanceof Error ? error.message : "Failed to fetch observations";
+      setError(errorMessage);
+      setIsLoading(false);
+      console.error("Error fetching observations:", error);
+    }
+  }, [filters, observations]);
+
+  // Set filters (with Supabase save)
+  const setFilters = useCallback(async (newFilters: FilterParams) => {
+    const currentFilters = filters;
+    
+    // Save to Supabase
+    await saveFilters(newFilters);
+    
+    setFiltersState(newFilters);
+    
+    // If filters changed, clear observations and refetch for current viewport
+    const filtersChanged = JSON.stringify(currentFilters) !== JSON.stringify(newFilters);
+    if (filtersChanged && viewport) {
+      setObservations([]); // Clear to trigger refetch
+      fetchObservationsForViewport(viewport);
+    }
+  }, [filters, viewport, fetchObservationsForViewport]);
+
+  // Mark observation as seen
+  const markObservationAsSeenCallback = useCallback(async (observationId: string) => {
+    await markObservationAsSeenService(observationId);
+    
+    // Update local state
+    setSeenObservationIds(prev => {
+      const newSet = new Set(prev);
+      newSet.add(observationId);
+      return newSet;
+    });
+  }, []);
 
   // Filter observations to those within a reasonable distance of current viewport
   // This keeps cluster counts accurate while preventing memory issues
   // When zooming into a cluster, use more generous filtering to show all cluster markers
   const filteredObservations = React.useMemo(() => {
     if (!viewport) return observations;
+    
+    let filtered = observations;
+    
+    // Filter by seen status if showNewOnly is enabled
+    if (filters.showNewOnly) {
+      filtered = filtered.filter(obs => !seenObservationIds.has(obs.id));
+    }
     
     // When zoomed in (clustering disabled), use more generous padding to show all markers
     // When zoomed out (clustering enabled), use tighter filtering for performance
@@ -123,12 +251,12 @@ export const MapScreen: React.FC = () => {
     const latPadding = viewport.latitudeDelta * paddingMultiplier;
     const lngPadding = viewport.longitudeDelta * paddingMultiplier;
     
-    return observations.filter(obs => {
+    return filtered.filter(obs => {
       const latDiff = Math.abs(obs.lat - viewport.latitude);
       const lngDiff = Math.abs(obs.lng - viewport.longitude);
       return latDiff <= latPadding && lngDiff <= lngPadding;
     });
-  }, [observations, viewport]);
+  }, [observations, viewport, filters.showNewOnly, seenObservationIds]);
 
   // Limit markers at low zoom for performance
   const MAX_MARKERS = 500;
@@ -231,21 +359,42 @@ export const MapScreen: React.FC = () => {
       
       debouncedFetch(region);
     },
-    [debouncedFetch, setViewport]
+    [debouncedFetch]
   );
 
-  // Load filters and seen observations on mount
+  // Load filters and seen observations on mount (only once)
   useEffect(() => {
-    loadFilters();
-    loadSeenObservations();
-  }, [loadFilters, loadSeenObservations]);
+    // Load filters from Supabase
+    if (!filtersLoaded) {
+      loadFilters().then((loadedFilters) => {
+        setFiltersState(loadedFilters);
+        setFiltersLoaded(true);
+      });
+    }
+    
+    // Load seen observations from Supabase
+    if (!seenObservationsLoaded) {
+      getSeenObservationIds().then((seenIds) => {
+        setSeenObservationIds(seenIds);
+        setSeenObservationsLoaded(true);
+      });
+    }
+  }, [filtersLoaded, seenObservationsLoaded]);
+
+  // Handle deep-linked observation
+  useEffect(() => {
+    if (deepLinkedObservation) {
+      setSelectedObservation(deepLinkedObservation);
+      setDeepLinkedObservation(null); // Clear after using
+    }
+  }, [deepLinkedObservation, setDeepLinkedObservation]);
 
   // Mark observation as seen when selected
   useEffect(() => {
     if (selectedObservation) {
-      markObservationAsSeen(selectedObservation.id);
+      markObservationAsSeenCallback(selectedObservation.id);
     }
-  }, [selectedObservation, markObservationAsSeen]);
+  }, [selectedObservation, markObservationAsSeenCallback]);
 
   // Get user location and fetch initial observations
   useEffect(() => {
@@ -312,7 +461,7 @@ export const MapScreen: React.FC = () => {
       if (observationId) {
         const observation = await fetchObservationById(observationId);
         if (observation) {
-          setSelectedObservation(observation);
+          setDeepLinkedObservation(observation);
           // Center map on observation location
           if (mapRef.current) {
             mapRef.current.animateToRegion(
@@ -330,7 +479,7 @@ export const MapScreen: React.FC = () => {
     } catch (error) {
       console.error("Error handling deep link:", error);
     }
-  }, [setSelectedObservation]);
+  }, [setDeepLinkedObservation]);
 
   // Handle deep links
   useEffect(() => {
@@ -391,11 +540,11 @@ export const MapScreen: React.FC = () => {
   }, [selectedObservation, viewport]);
 
   const handleRetry = useCallback(() => {
-    clearError();
+    setError(null);
     if (viewport) {
       fetchObservationsForViewport(viewport);
     }
-  }, [viewport, fetchObservationsForViewport, clearError]);
+  }, [viewport, fetchObservationsForViewport]);
 
   // Center map on user location
   const handleCenterOnLocation = useCallback(async () => {
@@ -665,41 +814,9 @@ export const MapScreen: React.FC = () => {
 
       {/* ObservationSheet */}
       <ObservationSheet
-          observation={selectedObservation}
-          onClose={() => setSelectedObservation(null)}
-          onShowOnMap={
-            selectedObservation
-              ? () => {
-                  // Center map on observation
-                  if (mapRef.current && selectedObservation) {
-                    // Set flag to prevent refetching when centering on observation
-                    isZoomingIntoClusterRef.current = true;
-
-                    // Adjust center point to position marker higher on screen (accounting for bottom sheet)
-                    const currentViewport = viewport || DEFAULT_REGION;
-                    const verticalOffset = currentViewport.latitudeDelta * 0.15;
-                    const adjustedLatitude = selectedObservation.lat - verticalOffset;
-
-                    // Animate to the adjusted coordinate with a reasonable zoom level
-                    mapRef.current.animateToRegion(
-                      {
-                        latitude: adjustedLatitude,
-                        longitude: selectedObservation.lng,
-                        latitudeDelta: 0.01,
-                        longitudeDelta: 0.01,
-                      },
-                      500
-                    );
-
-                    // Reset the flag after animation completes
-                    setTimeout(() => {
-                      isZoomingIntoClusterRef.current = false;
-                    }, 1000);
-                  }
-                }
-              : undefined
-          }
-        />
+        observation={selectedObservation}
+        onClose={() => setSelectedObservation(null)}
+      />
 
       <FilterSheet
         visible={showFilterSheet}

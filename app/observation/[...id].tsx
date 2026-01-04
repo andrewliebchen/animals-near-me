@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { useObservationStore } from "../../src/store/observationStore";
+import { useDeepLink } from "../../src/context/DeepLinkContext";
 import { fetchObservationById } from "../../src/api/client";
 
 /**
@@ -14,7 +14,7 @@ export default function ObservationRoute() {
   // Catch-all route params are arrays, so get first element
   const idParam = params.id;
   const id = Array.isArray(idParam) ? idParam[0] : idParam;
-  const setSelectedObservation = useObservationStore((state) => state.setSelectedObservation);
+  const { setDeepLinkedObservation } = useDeepLink();
 
   useEffect(() => {
     if (!id || typeof id !== "string") {
@@ -27,7 +27,7 @@ export default function ObservationRoute() {
       try {
         const observation = await fetchObservationById(id);
         if (observation) {
-          setSelectedObservation(observation);
+          setDeepLinkedObservation(observation);
         }
       } catch (error) {
         console.error("Error fetching observation from deep link:", error);
@@ -38,7 +38,7 @@ export default function ObservationRoute() {
     };
 
     handleObservation();
-  }, [id, router, setSelectedObservation]);
+  }, [id, router, setDeepLinkedObservation]);
 
   return null;
 }

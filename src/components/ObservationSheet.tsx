@@ -25,16 +25,14 @@ import { useTheme } from "../utils/theme";
 interface ObservationSheetProps {
   observation: Observation | null;
   onClose: () => void;
-  onShowOnMap?: () => void;
 }
 
 export const ObservationSheet: React.FC<ObservationSheetProps> = ({
   observation,
   onClose,
-  onShowOnMap,
 }) => {
   const theme = useTheme();
-  const snapPoints = useMemo(() => ["50%", "90%"], []);
+  const snapPoints = useMemo(() => ["55%", "100%"], []);
   const sheetRef = React.useRef<BottomSheet | null>(null);
   const [isSheetReady, setIsSheetReady] = useState(false);
   
@@ -366,28 +364,6 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
             onPress={handleOpenDetail}
           >
             <Text style={styles.linkText} allowFontScaling={true}>View on {providerName} →</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Show on Map Button */}
-        {onShowOnMap && (
-          <TouchableOpacity
-            style={dynamicStyles.linkButton}
-            onPress={() => {
-              // Collapse to smallest snap point (index 0 = 50%)
-              if (sheetRef.current) {
-                sheetRef.current.snapToIndex(0);
-              }
-              // Call the handler after a brief delay to allow collapse animation
-              setTimeout(() => {
-                onShowOnMap();
-              }, 100);
-            }}
-          >
-            <View style={styles.linkButtonContent}>
-              <Ionicons name="map-outline" size={18} color="#3B82F6" />
-              <Text style={styles.linkText} allowFontScaling={true}>Show on map</Text>
-            </View>
           </TouchableOpacity>
         )}
 

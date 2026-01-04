@@ -29,6 +29,7 @@ export function countActiveFilters(filters: FilterParams): number {
   if (filters.taxa.length > 0) count++;
   // Don't count providers when both are selected (default)
   if (filters.provider.length > 0 && filters.provider.length < 2) count++;
+  if (filters.showNewOnly) count++;
   return count;
 }
 

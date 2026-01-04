@@ -95,6 +95,10 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
     setLocalFilters({ ...localFilters, provider: newProvider });
   };
 
+  const handleShowNewOnlyChange = (value: boolean) => {
+    setLocalFilters({ ...localFilters, showNewOnly: value });
+  };
+
   const handleApply = () => {
     onFiltersChange(localFilters);
     onClose();
@@ -246,12 +250,21 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
           {/* Photo Filter */}
           <View style={styles.section}>
             <View style={styles.switchRow}>
-              <Text style={dynamicStyles.switchLabel} allowFontScaling={true}>Has Photo</Text>
+              <Text style={dynamicStyles.switchLabel} allowFontScaling={true}>Has user-submitted photo</Text>
               <Switch
                 value={localFilters.hasPhoto === true}
                 onValueChange={(value) => {
                   handleHasPhotoChange(value ? true : null);
                 }}
+                trackColor={{ false: theme.border, true: "#3B82F6" }}
+                thumbColor="#FFFFFF"
+              />
+            </View>
+            <View style={styles.switchRow}>
+              <Text style={dynamicStyles.switchLabel} allowFontScaling={true}>Hide seen observations</Text>
+              <Switch
+                value={localFilters.showNewOnly || false}
+                onValueChange={handleShowNewOnlyChange}
                 trackColor={{ false: theme.border, true: "#3B82F6" }}
                 thumbColor="#FFFFFF"
               />
