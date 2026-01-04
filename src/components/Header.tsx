@@ -93,6 +93,7 @@ export const Header: React.FC<HeaderProps> = ({
                     : theme.text.secondary,
               },
             ]}
+            allowFontScaling={true}
           >
             Map
           </Text>
@@ -119,6 +120,7 @@ export const Header: React.FC<HeaderProps> = ({
                     : theme.text.secondary,
               },
             ]}
+            allowFontScaling={true}
           >
             Feed
           </Text>
@@ -134,12 +136,13 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <Text
             style={[styles.filterButtonText, { color: theme.text.primary }]}
+            allowFontScaling={true}
           >
             Filter
           </Text>
           {countActiveFilters(filters) > 0 && (
             <View style={styles.filterBadge}>
-              <Text style={styles.filterBadgeText}>
+              <Text style={styles.filterBadgeText} allowFontScaling={true}>
                 {countActiveFilters(filters)}
               </Text>
             </View>

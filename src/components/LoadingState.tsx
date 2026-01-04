@@ -27,7 +27,7 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
   return (
     <View style={dynamicStyles.container}>
       <ActivityIndicator size="small" color="#3B82F6" />
-      <Text style={dynamicStyles.text}>{message}</Text>
+      <Text style={dynamicStyles.text} allowFontScaling={true}>{message}</Text>
     </View>
   );
 };

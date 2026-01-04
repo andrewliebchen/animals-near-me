@@ -34,7 +34,7 @@ export const ColorLegend: React.FC<ColorLegendProps> = ({ visible }) => {
 
   return (
     <View style={dynamicStyles.container}>
-      <Text style={dynamicStyles.title}>Categories</Text>
+      <Text style={dynamicStyles.title} allowFontScaling={true}>Categories</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         <View style={styles.legend}>
           {taxaBuckets.map((bucket) => (
@@ -45,7 +45,7 @@ export const ColorLegend: React.FC<ColorLegendProps> = ({ visible }) => {
                   { backgroundColor: TAXA_COLORS[bucket] },
                 ]}
               />
-              <Text style={dynamicStyles.legendText}>{bucket}</Text>
+              <Text style={dynamicStyles.legendText} allowFontScaling={true}>{bucket}</Text>
             </View>
           ))}
         </View>

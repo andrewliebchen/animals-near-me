@@ -35,7 +35,7 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
 }) => {
   const theme = useTheme();
   const snapPoints = useMemo(() => ["40%", "90%"], []);
-  const sheetRef = React.useRef<BottomSheet>(null);
+  const sheetRef = React.useRef<BottomSheet | null>(null);
   const [isSheetReady, setIsSheetReady] = useState(false);
   
   const [wikipediaData, setWikipediaData] = useState<WikipediaSummary | null>(null);
@@ -284,7 +284,7 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
         {isTransitioning && (
           <View style={dynamicStyles.loadingOverlay}>
             <ActivityIndicator size="large" color={theme.text.primary} />
-            <Text style={[styles.loadingOverlayText, { color: theme.text.secondary }]}>
+            <Text style={[styles.loadingOverlayText, { color: theme.text.secondary }]} allowFontScaling={true}>
               Loading...
             </Text>
           </View>
@@ -311,11 +311,11 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
         {/* Names and Share Button */}
         <View style={styles.header}>
           <View style={styles.nameSection}>
-            <Text style={dynamicStyles.commonName}>
+            <Text style={dynamicStyles.commonName} allowFontScaling={true}>
               {observation.commonName || observation.scientificName || "Unknown"}
             </Text>
             {observation.scientificName && (
-              <Text style={dynamicStyles.scientificName}>
+              <Text style={dynamicStyles.scientificName} allowFontScaling={true}>
                 {observation.scientificName}
               </Text>
             )}
@@ -333,26 +333,26 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
         <View style={styles.section}>
           <View style={styles.categoryRow}>
             <View style={[styles.taxaChip, { borderColor: color }]}>
-              <Text style={[styles.taxaText, { color }]}>
+              <Text style={[styles.taxaText, { color }]} allowFontScaling={true}>
                 {observation.taxaBucket}
               </Text>
             </View>
             <View style={[styles.badge, { backgroundColor: color }]}>
-              <Text style={styles.badgeText}>{providerName}</Text>
+              <Text style={styles.badgeText} allowFontScaling={true}>{providerName}</Text>
             </View>
           </View>
         </View>
 
         {/* Observed Date/Time */}
         <View style={styles.section}>
-          <Text style={dynamicStyles.label}>Observed</Text>
-          <Text style={dynamicStyles.value}>{formatDate(observation.observedAt)}</Text>
+          <Text style={dynamicStyles.label} allowFontScaling={true}>Observed</Text>
+          <Text style={dynamicStyles.value} allowFontScaling={true}>{formatDate(observation.observedAt)}</Text>
         </View>
 
         {/* Location */}
         <View style={styles.section}>
-          <Text style={dynamicStyles.label}>Location</Text>
-          <Text style={dynamicStyles.value}>
+          <Text style={dynamicStyles.label} allowFontScaling={true}>Location</Text>
+          <Text style={dynamicStyles.value} allowFontScaling={true}>
             {observation.placeGuess ||
               `${observation.lat.toFixed(4)}, ${observation.lng.toFixed(4)}`}
           </Text>
@@ -364,7 +364,7 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
             style={dynamicStyles.linkButton}
             onPress={handleOpenDetail}
           >
-            <Text style={styles.linkText}>View on {providerName} →</Text>
+            <Text style={styles.linkText} allowFontScaling={true}>View on {providerName} →</Text>
           </TouchableOpacity>
         )}
 
@@ -385,7 +385,7 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
           >
             <View style={styles.linkButtonContent}>
               <Ionicons name="map-outline" size={18} color="#3B82F6" />
-              <Text style={styles.linkText}>Show on map</Text>
+              <Text style={styles.linkText} allowFontScaling={true}>Show on map</Text>
             </View>
           </TouchableOpacity>
         )}
@@ -393,18 +393,18 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
         {/* Wikipedia Section */}
         {wikipediaLoading && (
           <View style={dynamicStyles.wikipediaSection}>
-            <Text style={dynamicStyles.label}>About</Text>
+            <Text style={dynamicStyles.label} allowFontScaling={true}>About</Text>
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color={theme.text.secondary} />
-              <Text style={[dynamicStyles.loadingText, { marginLeft: 8 }]}>Loading information...</Text>
+              <Text style={[dynamicStyles.loadingText, { marginLeft: 8 }]} allowFontScaling={true}>Loading information...</Text>
             </View>
           </View>
         )}
 
         {!wikipediaLoading && wikipediaData && wikipediaData.extract && (
           <View style={dynamicStyles.wikipediaSection}>
-            <Text style={dynamicStyles.label}>About</Text>
-            <Text style={dynamicStyles.wikipediaExtract}>{wikipediaData.extract}</Text>
+            <Text style={dynamicStyles.label} allowFontScaling={true}>About</Text>
+            <Text style={dynamicStyles.wikipediaExtract} allowFontScaling={true}>{wikipediaData.extract}</Text>
             {wikipediaData.content_urls?.desktop?.page && (
               <TouchableOpacity
                 style={dynamicStyles.linkButton}
@@ -412,7 +412,7 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
                   Linking.openURL(wikipediaData.content_urls!.desktop!.page);
                 }}
               >
-                <Text style={styles.linkText}>
+                <Text style={styles.linkText} allowFontScaling={true}>
                   Read more on Wikipedia →
                 </Text>
               </TouchableOpacity>
@@ -517,7 +517,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   taxaText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "600",
   },
   linkButton: {

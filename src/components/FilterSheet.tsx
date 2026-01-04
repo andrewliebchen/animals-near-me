@@ -171,7 +171,7 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
         style={[styles.button, dynamicStyles.clearButton]}
         onPress={handleClear}
       >
-        <Text style={dynamicStyles.clearButtonText}>Clear All</Text>
+        <Text style={dynamicStyles.clearButtonText} allowFontScaling={true}>Clear All</Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={[
@@ -187,6 +187,7 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
             styles.applyButtonText,
             !hasChanges && dynamicStyles.applyButtonTextDisabled,
           ]}
+          allowFontScaling={true}
         >
           Apply {activeCount > 0 && `(${activeCount})`}
         </Text>
@@ -212,11 +213,11 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
           style={styles.scrollContent}
           contentContainerStyle={styles.scrollContentContainer}
         >
-          <Text style={dynamicStyles.title}>Filter Observations</Text>
+          <Text style={dynamicStyles.title} allowFontScaling={true}>Filter Observations</Text>
 
           {/* Recency Filter */}
           <View style={styles.section}>
-            <Text style={dynamicStyles.sectionTitle}>Recency</Text>
+            <Text style={dynamicStyles.sectionTitle} allowFontScaling={true}>Recency</Text>
             <View style={styles.recencyContainer}>
               {RECENCY_OPTIONS.map((option) => (
                 <TouchableOpacity
@@ -232,6 +233,7 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
                       dynamicStyles.recencyButtonText,
                       localFilters.recency === option.value && styles.recencyButtonTextActive,
                     ]}
+                    allowFontScaling={true}
                   >
                     {option.label}
                   </Text>
@@ -243,7 +245,7 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
           {/* Photo Filter */}
           <View style={styles.section}>
             <View style={styles.switchRow}>
-              <Text style={dynamicStyles.switchLabel}>Has Photo</Text>
+              <Text style={dynamicStyles.switchLabel} allowFontScaling={true}>Has Photo</Text>
               <Switch
                 value={localFilters.hasPhoto === true}
                 onValueChange={(value) => {
@@ -257,7 +259,7 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
 
           {/* Taxa Filter */}
           <View style={styles.section}>
-            <Text style={dynamicStyles.sectionTitle}>Categories</Text>
+            <Text style={dynamicStyles.sectionTitle} allowFontScaling={true}>Categories</Text>
             <View style={styles.taxaGrid}>
               {TAXA_OPTIONS.map((taxa) => {
                 const isSelected = localFilters.taxa.includes(taxa);
@@ -277,12 +279,13 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
                         dynamicStyles.taxaChipText,
                         { color: isSelected ? color : theme.text.secondary },
                       ]}
+                      allowFontScaling={true}
                     >
                       {taxa}
                     </Text>
                     {isSelected && (
                       <View style={[styles.checkmark, { backgroundColor: color }]}>
-                        <Text style={styles.checkmarkText}>✓</Text>
+                        <Text style={styles.checkmarkText} allowFontScaling={true}>✓</Text>
                       </View>
                     )}
                   </TouchableOpacity>
@@ -294,19 +297,19 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
                 style={styles.clearFilterButton}
                 onPress={() => setLocalFilters({ ...localFilters, taxa: [] })}
               >
-                <Text style={dynamicStyles.clearFilterText}>Clear Selection</Text>
+                <Text style={dynamicStyles.clearFilterText} allowFontScaling={true}>Clear Selection</Text>
               </TouchableOpacity>
             )}
           </View>
 
           {/* Provider Filter */}
           <View style={styles.section}>
-            <Text style={dynamicStyles.sectionTitle}>Data Source</Text>
+            <Text style={dynamicStyles.sectionTitle} allowFontScaling={true}>Data Source</Text>
             {PROVIDER_OPTIONS.map((option) => {
               const isSelected = localFilters.provider.includes(option.value);
               return (
                 <View key={option.value} style={styles.switchRow}>
-                  <Text style={dynamicStyles.switchLabel}>{option.label}</Text>
+                  <Text style={dynamicStyles.switchLabel} allowFontScaling={true}>{option.label}</Text>
                   <Switch
                     value={isSelected}
                     onValueChange={(value) => handleProviderToggle(option.value, value)}

@@ -598,12 +598,13 @@ export const MapScreen: React.FC = () => {
           >
             <Text
               style={[styles.filterButtonText, { color: theme.text.primary }]}
+              allowFontScaling={true}
             >
               Filter
             </Text>
             {countActiveFilters(filters) > 0 && (
               <View style={styles.filterBadge}>
-                <Text style={styles.filterBadgeText}>
+                <Text style={styles.filterBadgeText} allowFontScaling={true}>
                   {countActiveFilters(filters)}
                 </Text>
               </View>

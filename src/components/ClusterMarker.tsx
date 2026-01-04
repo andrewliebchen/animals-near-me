@@ -42,6 +42,7 @@ export const ClusterMarker: React.FC<ClusterMarkerProps> = ({
             },
           ]}
           numberOfLines={1}
+          allowFontScaling={true}
         >
           {count}
         </Text>

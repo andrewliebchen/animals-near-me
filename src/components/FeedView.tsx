@@ -143,24 +143,24 @@ const FeedItem: React.FC<FeedItemProps> = ({ observation, distance, bearing: bea
         />
       ) : (
         <View style={[styles.thumbnail, styles.thumbnailPlaceholder, { backgroundColor: theme.background.secondary }]}>
-          <Text style={[styles.placeholderText, { color: theme.text.muted }]}>No photo</Text>
+          <Text style={[styles.placeholderText, { color: theme.text.muted }]} allowFontScaling={true}>No photo</Text>
         </View>
       )}
       <View style={styles.feedItemContent}>
         <View style={styles.feedItemHeader}>
           <View style={styles.titleRow}>
             <View style={styles.nameContainer}>
-              <Text style={[styles.feedItemName, { color: theme.text.primary }]} numberOfLines={1}>
+              <Text style={[styles.feedItemName, { color: theme.text.primary }]} numberOfLines={1} allowFontScaling={true}>
                 {observation.commonName || observation.scientificName || "Unknown"}
               </Text>
               {observation.scientificName && observation.scientificName !== observation.commonName && (
-                <Text style={[styles.feedItemScientific, { color: theme.text.secondary }]} numberOfLines={1}>
+                <Text style={[styles.feedItemScientific, { color: theme.text.secondary }]} numberOfLines={1} allowFontScaling={true}>
                   {observation.scientificName}
                 </Text>
               )}
             </View>
             <View style={[styles.taxaChip, { borderColor: color }]}>
-              <Text style={[styles.taxaChipText, { color }]}>
+              <Text style={[styles.taxaChipText, { color }]} allowFontScaling={true}>
                 {observation.taxaBucket}
               </Text>
             </View>
@@ -168,7 +168,7 @@ const FeedItem: React.FC<FeedItemProps> = ({ observation, distance, bearing: bea
         </View>
         {distance !== null && (
           <View style={styles.distanceContainer}>
-            <Text style={[styles.feedItemDistance, { color: theme.text.secondary }]}>
+            <Text style={[styles.feedItemDistance, { color: theme.text.secondary }]} allowFontScaling={true}>
               {formatDistance(distance)}
             </Text>
             {bearingDeg !== null && (
@@ -182,7 +182,7 @@ const FeedItem: React.FC<FeedItemProps> = ({ observation, distance, bearing: bea
                     { transform: [{ rotate: `${bearingDeg}deg` }] },
                   ]}
                 />
-                <Text style={[styles.bearingText, { color: theme.text.muted }]}>
+                <Text style={[styles.bearingText, { color: theme.text.muted }]} allowFontScaling={true}>
                   {formatBearing(bearingDeg)}
                 </Text>
               </>
@@ -253,7 +253,7 @@ export const FeedView: React.FC<FeedViewProps> = ({
     return (
       <View style={[styles.container, styles.centerContent, { backgroundColor: feedBackgroundColor }]}>
         <ActivityIndicator size="large" color={theme.text.primary} />
-        <Text style={[styles.loadingText, { color: theme.text.secondary }]}>
+        <Text style={[styles.loadingText, { color: theme.text.secondary }]} allowFontScaling={true}>
           Loading observations...
         </Text>
       </View>
@@ -263,7 +263,7 @@ export const FeedView: React.FC<FeedViewProps> = ({
   if (filteredAndSorted.length === 0) {
     return (
       <View style={[styles.container, styles.centerContent, { backgroundColor: feedBackgroundColor }]}>
-        <Text style={[styles.emptyText, { color: theme.text.secondary }]}>
+        <Text style={[styles.emptyText, { color: theme.text.secondary }]} allowFontScaling={true}>
           {countActiveFilters(filters) > 0
             ? "No observations match your filters"
             : "No observations found"}
@@ -285,7 +285,7 @@ export const FeedView: React.FC<FeedViewProps> = ({
     return (
       <View style={styles.footer}>
         <ActivityIndicator size="small" color={theme.text.primary} />
-        <Text style={[styles.footerText, { color: theme.text.secondary }]}>
+        <Text style={[styles.footerText, { color: theme.text.secondary }]} allowFontScaling={true}>
           Loading more...
         </Text>
       </View>

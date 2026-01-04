@@ -21,10 +21,10 @@ export const ErrorState: React.FC<ErrorStateProps> = ({ error, onRetry }) => {
 
   return (
     <View style={dynamicStyles.container}>
-      <Text style={styles.errorText}>{error}</Text>
+      <Text style={styles.errorText} allowFontScaling={true}>{error}</Text>
       {onRetry && (
         <TouchableOpacity style={styles.retryButton} onPress={onRetry}>
-          <Text style={styles.retryText}>Retry</Text>
+          <Text style={styles.retryText} allowFontScaling={true}>Retry</Text>
         </TouchableOpacity>
       )}
     </View>
