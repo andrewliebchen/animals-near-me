@@ -7,6 +7,7 @@ export interface FilterParams {
   hasPhoto: boolean | null; // null = all, true = has photo, false = no photo
   taxa: TaxaBucket[]; // empty = all
   provider: Provider[]; // empty = all
+  showNewOnly?: boolean; // If true, only show observations that haven't been seen
 }
 
 export const DEFAULT_FILTERS: FilterParams = {
@@ -14,6 +15,7 @@ export const DEFAULT_FILTERS: FilterParams = {
   hasPhoto: null,
   taxa: [],
   provider: ["ebird", "inat"], // Both providers selected by default
+  showNewOnly: false,
 };
 
 /**

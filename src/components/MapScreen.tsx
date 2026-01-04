@@ -89,11 +89,15 @@ export const MapScreen: React.FC = () => {
     isLoadingMore,
     error,
     filters,
+    seenObservationIds,
     fetchObservationsForViewport,
     setSelectedObservation,
     setViewport,
     setFilters,
     clearError,
+    loadFilters,
+    loadSeenObservations,
+    markObservationAsSeen,
   } = useObservationStore();
 
 
@@ -229,6 +233,19 @@ export const MapScreen: React.FC = () => {
     },
     [debouncedFetch, setViewport]
   );
+
+  // Load filters and seen observations on mount
+  useEffect(() => {
+    loadFilters();
+    loadSeenObservations();
+  }, [loadFilters, loadSeenObservations]);
+
+  // Mark observation as seen when selected
+  useEffect(() => {
+    if (selectedObservation) {
+      markObservationAsSeen(selectedObservation.id);
+    }
+  }, [selectedObservation, markObservationAsSeen]);
 
   // Get user location and fetch initial observations
   useEffect(() => {
@@ -571,19 +588,23 @@ export const MapScreen: React.FC = () => {
           mapType="terrain"
           customMapStyle={CUSTOM_MAP_STYLE}
         >
-            {displayedObservations.map((item) => (
-              <ObservationMarker
-                key={item.observation.id}
-                observation={item.observation}
-                onPress={setSelectedObservation}
-                coordinate={{
-                  latitude: item.observation.lat,
-                  longitude: item.observation.lng,
-                }}
-                offset={item.offset}
-                selected={selectedObservation?.id === item.observation.id}
-              />
-            ))}
+            {displayedObservations.map((item) => {
+              const isSeen = seenObservationIds.has(item.observation.id);
+              return (
+                <ObservationMarker
+                  key={item.observation.id}
+                  observation={item.observation}
+                  onPress={setSelectedObservation}
+                  coordinate={{
+                    latitude: item.observation.lat,
+                    longitude: item.observation.lng,
+                  }}
+                  offset={item.offset}
+                  selected={selectedObservation?.id === item.observation.id}
+                  seen={isSeen}
+                />
+              );
+            })}
           </ClusteredMapView>
 
         <>

@@ -69,7 +69,10 @@
               "host": "*"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -82,7 +85,8 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Allow Animals Near Me to use your location to show nearby wildlife observations."
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "extra": {
       "eas": {

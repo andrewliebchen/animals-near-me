@@ -16,6 +16,7 @@ interface ObservationMarkerProps {
     lng: number;
   };
   selected?: boolean;
+  seen?: boolean;
 }
 
 export const ObservationMarker: React.FC<ObservationMarkerProps> = ({
@@ -23,6 +24,7 @@ export const ObservationMarker: React.FC<ObservationMarkerProps> = ({
   onPress,
   offset,
   selected = false,
+  seen = false,
 }) => {
   const color = getTaxaColor(observation.taxaBucket);
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -100,7 +102,13 @@ export const ObservationMarker: React.FC<ObservationMarkerProps> = ({
             ]}
           />
         )}
-        <View style={[styles.marker, { backgroundColor: color }]} />
+        <View 
+          style={[
+            styles.marker, 
+            { backgroundColor: color },
+            seen && styles.markerSeen,
+          ]} 
+        />
       </View>
     </Marker>
   );
@@ -124,6 +132,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 2,
     elevation: 3,
+  },
+  markerSeen: {
+    opacity: 0.5,
+    borderWidth: 1,
   },
   pulseRing: {
     position: "absolute",
