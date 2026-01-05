@@ -648,12 +648,13 @@ export const MapScreen: React.FC = () => {
           isZoomingIntoClusterRef.current = true;
 
           // Use fitToCoordinates to show all markers with padding
+          // Increased padding to inset points from edges
           mapRef.current.fitToCoordinates(coordinates, {
             edgePadding: {
-              top: 100,
-              right: 100,
-              bottom: 100,
-              left: 100,
+              top: 150,
+              right: 150,
+              bottom: 150,
+              left: 150,
             },
             animated: true,
           });
@@ -742,7 +743,7 @@ export const MapScreen: React.FC = () => {
           clusterColor="#2563EB"
           clusterTextColor="#FFFFFF"
           radius={60}
-          extent={512}
+          extent={256}
           minZoom={0}
           maxZoom={20}
           minPoints={2}

@@ -53,7 +53,7 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
   onClose,
 }) => {
   const theme = useTheme();
-  const snapPoints = useMemo(() => ["80%"], []);
+  const snapPoints = useMemo(() => ["100%"], []);
   const sheetRef = React.useRef<BottomSheet>(null);
   const [localFilters, setLocalFilters] = useState<FilterParams>(filters);
 
@@ -199,6 +199,27 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
     </BottomSheetView>
   );
 
+  // Create diffuse shadow that works in both light and dark modes
+  // Creates a subtle "step-off" effect from the background
+  const isDark = theme.background.primary === "#000000";
+  
+  // In dark mode, use a subtle light shadow for separation
+  // In light mode, use a soft dark shadow
+  const shadowColor = isDark 
+    ? "rgba(255, 255, 255, 0.08)"  // Subtle white glow in dark mode
+    : "rgba(0, 0, 0, 0.12)";       // Soft black shadow in light mode
+  
+  const shadowStyle = {
+    backgroundColor: theme.background.card,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    shadowColor,
+    shadowOffset: { width: 0, height: -2 }, // Slight upward shadow
+    shadowOpacity: 1,
+    shadowRadius: 20, // Large radius for diffuse effect
+    elevation: 16, // Android shadow - higher for more prominence
+  };
+
   return (
     <BottomSheet
       ref={sheetRef}
@@ -208,8 +229,9 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
       onClose={onClose}
       onChange={() => {}}
       enableDynamicSizing={false}
+      topInset={130}
       handleIndicatorStyle={{ backgroundColor: theme.border, width: 80 }}
-      backgroundStyle={{ backgroundColor: theme.background.card }}
+      backgroundStyle={shadowStyle}
       footerComponent={footerComponent}
       enableOverDrag={false}
     >
