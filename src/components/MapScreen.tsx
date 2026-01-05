@@ -111,7 +111,8 @@ export const MapScreen: React.FC = () => {
   // Fetch observations for viewport
   const fetchObservationsForViewport = useCallback(async (
     region: Region,
-    userLocation?: { latitude: number; longitude: number }
+    userLocation?: { latitude: number; longitude: number },
+    filtersToUse?: FilterParams
   ) => {
     // Cancel previous request if exists
     if (viewportAbortControllerRef.current) {
@@ -127,9 +128,11 @@ export const MapScreen: React.FC = () => {
     
     try {
       const viewportParams = regionToViewportParams(region);
+      const filtersForFetch = filtersToUse || filters;
+      
       const newObservations = await fetchObservations(
         viewportParams, 
-        filters,
+        filtersForFetch,
         {
           userLocation,
           limit: 1000, // Limit for map view
@@ -142,11 +145,14 @@ export const MapScreen: React.FC = () => {
         return;
       }
       
-      // When userLocation is provided, replace observations to maintain server-side sorting
-      // When userLocation is not provided, merge to preserve cluster counts when zooming
+      // When filters are explicitly provided (filter change), replace observations completely
+      // When filters are not provided (viewport change), merge to preserve cluster counts when zooming
       let mergedObservations: Observation[];
       
-      if (userLocation) {
+      if (filtersToUse) {
+        // Filters were explicitly provided (filter changed), replace completely
+        mergedObservations = newObservations;
+      } else if (userLocation) {
         // For feed view: replace with new observations to maintain distance-based sorting
         // The server has already sorted by distance, so we should preserve that order
         const observationMap = new Map<string, Observation>();
@@ -214,7 +220,8 @@ export const MapScreen: React.FC = () => {
     const filtersChanged = JSON.stringify(currentFilters) !== JSON.stringify(newFilters);
     if (filtersChanged && viewport) {
       setObservations([]); // Clear to trigger refetch
-      fetchObservationsForViewport(viewport);
+      // Pass newFilters explicitly to use the updated filters immediately
+      fetchObservationsForViewport(viewport, undefined, newFilters);
     }
   }, [filters, viewport, fetchObservationsForViewport]);
 
@@ -232,7 +239,7 @@ export const MapScreen: React.FC = () => {
 
   // Filter observations to those within a reasonable distance of current viewport
   // This keeps cluster counts accurate while preventing memory issues
-  // When zooming into a cluster, use more generous filtering to show all cluster markers
+  // When zoomed into a cluster, use more generous filtering to show all cluster markers
   const filteredObservations = React.useMemo(() => {
     if (!viewport) return observations;
     
@@ -381,6 +388,7 @@ export const MapScreen: React.FC = () => {
     }
   }, [filtersLoaded, seenObservationsLoaded]);
 
+
   // Handle deep-linked observation
   useEffect(() => {
     if (deepLinkedObservation) {
@@ -396,15 +404,21 @@ export const MapScreen: React.FC = () => {
     }
   }, [selectedObservation, markObservationAsSeenCallback]);
 
-  // Get user location and fetch initial observations
+  // Get user location and fetch initial observations (wait for filters to load first)
   useEffect(() => {
+    // Wait for filters to load before fetching initial observations
+    if (!filtersLoaded) {
+      return;
+    }
+
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== "granted") {
           // Permission denied - fetch without location
           if (!viewport) {
-            fetchObservationsForViewport(DEFAULT_REGION);
+            // Use loaded filters for initial fetch
+            fetchObservationsForViewport(DEFAULT_REGION, undefined, filters);
           }
           return;
         }
@@ -428,18 +442,20 @@ export const MapScreen: React.FC = () => {
             latitudeDelta: DEFAULT_REGION.latitudeDelta,
             longitudeDelta: DEFAULT_REGION.longitudeDelta,
           };
-          fetchObservationsForViewport(initialViewport, coords);
+          // Use loaded filters for initial fetch
+          fetchObservationsForViewport(initialViewport, coords, filters);
         }
       } catch (error) {
         console.error("Error getting user location:", error);
         // If location fails, still fetch observations without location
         if (!viewport) {
-          fetchObservationsForViewport(DEFAULT_REGION);
+          // Use loaded filters for initial fetch
+          fetchObservationsForViewport(DEFAULT_REGION, undefined, filters);
         }
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [filtersLoaded, filters, viewport, fetchObservationsForViewport]);
 
   const handleDeepLink = useCallback(async (url: string) => {
     try {
