@@ -34,6 +34,27 @@ export function viewportToBoundingBox(viewport: Viewport): BoundingBox {
 }
 
 /**
+ * Convert a bounding box to a closed WKT POLYGON (counter-clockwise).
+ * Ring order: SW → SE → NE → NW → SW.
+ */
+export function bboxToWktPolygon(bbox: BoundingBox): string {
+  const minLng = bbox.sw.lng;
+  const minLat = bbox.sw.lat;
+  const maxLng = bbox.ne.lng;
+  const maxLat = bbox.ne.lat;
+
+  const ring = [
+    `${minLng} ${minLat}`,
+    `${maxLng} ${minLat}`,
+    `${maxLng} ${maxLat}`,
+    `${minLng} ${maxLat}`,
+    `${minLng} ${minLat}`,
+  ].join(", ");
+
+  return `POLYGON((${ring}))`;
+}
+
+/**
  * Convert viewport to center + radius (approximate)
  */
 export function viewportToCenterRadius(viewport: Viewport): CenterRadius {

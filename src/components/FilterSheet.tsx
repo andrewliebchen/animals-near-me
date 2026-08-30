@@ -44,6 +44,7 @@ const TAXA_OPTIONS: TaxaBucket[] = [
 const PROVIDER_OPTIONS: Array<{ value: Provider; label: string }> = [
   { value: "ebird", label: "eBird" },
   { value: "inat", label: "iNaturalist" },
+  { value: "obis", label: "OBIS" },
 ];
 
 export const FilterSheet: React.FC<FilterSheetProps> = ({

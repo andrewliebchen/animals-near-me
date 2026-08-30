@@ -1,4 +1,4 @@
-export type Provider = "inat" | "ebird";
+export type Provider = "inat" | "ebird" | "obis";
 
 export type TaxaBucket =
   | "Bird"

@@ -1,7 +1,7 @@
 import { supabase } from '../utils/supabase';
 import { getDeviceId } from '../utils/deviceId';
 import type { FilterParams } from '../types/filters';
-import { DEFAULT_FILTERS } from '../types/filters';
+import { DEFAULT_FILTERS, FILTERS_SCHEMA_VERSION } from '../types/filters';
 
 /**
  * Load filters from Supabase for current device
@@ -32,11 +32,10 @@ export async function loadFilters(): Promise<FilterParams> {
 
     // Validate that filters exist and have the right structure
     if (data && data.filters) {
-      // Return the filters from DB, with defaults as fallback for missing fields
-      return {
+      return upgradeSavedFilters({
         ...DEFAULT_FILTERS,
         ...data.filters,
-      };
+      });
     }
 
     return DEFAULT_FILTERS;
@@ -44,6 +43,33 @@ export async function loadFilters(): Promise<FilterParams> {
     console.error('Error loading filters:', error);
     return DEFAULT_FILTERS;
   }
+}
+
+/**
+ * Older installs saved the two-source default. Treat that as "all sources"
+ * so existing devices pick up OBIS without an extra toggle.
+ */
+function upgradeSavedFilters(filters: FilterParams): FilterParams {
+  const version = filters.schemaVersion ?? 1;
+  if (version >= FILTERS_SCHEMA_VERSION) {
+    return {
+      ...filters,
+      schemaVersion: FILTERS_SCHEMA_VERSION,
+    };
+  }
+
+  const providers = filters.provider || [];
+  const isLegacyDefault =
+    providers.length === 2 &&
+    providers.includes("ebird") &&
+    providers.includes("inat") &&
+    !providers.includes("obis");
+
+  return {
+    ...filters,
+    provider: isLegacyDefault ? [...DEFAULT_FILTERS.provider] : providers,
+    schemaVersion: FILTERS_SCHEMA_VERSION,
+  };
 }
 
 /**

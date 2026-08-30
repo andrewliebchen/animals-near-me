@@ -160,7 +160,19 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
   }
 
   const color = getTaxaColor(observation.taxaBucket);
-  const providerName = observation.provider === "ebird" ? "eBird" : "iNaturalist";
+  const providerName =
+    observation.provider === "ebird"
+      ? "eBird"
+      : observation.provider === "obis"
+        ? "OBIS"
+        : "iNaturalist";
+  const isReceiverDetection =
+    observation.provider === "obis" &&
+    observation.raw?.basisOfRecord === "MachineObservation";
+  const attributionDataset =
+    observation.provider === "obis" ? observation.raw?.datasetName : undefined;
+  const attributionLicense =
+    observation.provider === "obis" ? observation.raw?.license : undefined;
 
   const handleOpenDetail = () => {
     if (observation.detailUrl) {
@@ -194,6 +206,15 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
     } catch {
       return dateString;
     }
+  };
+
+  const formatLicense = (license: string) => {
+    const lower = license.toLowerCase();
+    if (lower.includes("publicdomain") || lower.includes("/zero/")) return "CC0";
+    if (lower.includes("by-nc")) return "CC BY-NC";
+    if (lower.includes("by-sa")) return "CC BY-SA";
+    if (lower.includes("/by/")) return "CC BY";
+    return "OBIS";
   };
 
   const dynamicStyles = {
@@ -357,6 +378,15 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
           </Text>
         </View>
 
+        {isReceiverDetection && (
+          <View style={styles.section}>
+            <Text style={dynamicStyles.label} allowFontScaling={true}>Detection</Text>
+            <Text style={dynamicStyles.value} allowFontScaling={true}>
+              Acoustic receiver detection, not a live GPS track. This tagged animal was recorded near this receiver on this date.
+            </Text>
+          </View>
+        )}
+
         {/* External Link */}
         {observation.detailUrl && (
           <TouchableOpacity
@@ -365,6 +395,20 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
           >
             <Text style={styles.linkText} allowFontScaling={true}>View on {providerName} →</Text>
           </TouchableOpacity>
+        )}
+
+        {observation.provider === "obis" && (attributionDataset || attributionLicense) && (
+          <View style={styles.section}>
+            <Text style={dynamicStyles.label} allowFontScaling={true}>Source</Text>
+            <Text style={dynamicStyles.value} allowFontScaling={true}>
+              {[
+                attributionDataset,
+                attributionLicense ? formatLicense(attributionLicense) : "OBIS / CC BY-NC",
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </Text>
+          </View>
         )}
 
         {/* Wikipedia Section */}

@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { normalizeInat } from "../../server/providers/normalize";
+import { fetchObisById } from "../../server/providers/obis";
 import type { Observation } from "../../src/types/observation";
 
 const INAT_BASE_URL = "https://api.inaturalist.org/v1";
@@ -110,6 +111,8 @@ export default async function handler(
         error: "Sharing eBird observations is not yet supported",
         message: "eBird API doesn't support fetching observations by ID directly"
       });
+    } else if (provider === "obis") {
+      observation = await fetchObisById(providerId);
     } else {
       return res.status(400).json({ error: "Unknown provider" });
     }

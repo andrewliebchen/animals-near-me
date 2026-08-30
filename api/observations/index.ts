@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { fetchRecentEbird } from "../../server/providers/ebird";
 import { fetchInat } from "../../server/providers/inat";
+import { fetchRecentObis } from "../../server/providers/obis";
 import { viewportToBoundingBox, viewportToCenterRadius, distanceKm, bearing } from "../../server/utils/viewport";
 import { deduplicateObservations } from "../../server/utils/dedupe";
 import { getCacheKey, getCached, setCached } from "../../server/utils/cache";
@@ -82,7 +83,9 @@ export default async function handler(
       provider: req.query.provider
         ? (req.query.provider as string)
             .split(",")
-            .filter((p): p is Provider => p === "ebird" || p === "inat")
+            .filter((p): p is Provider =>
+              p === "ebird" || p === "inat" || p === "obis"
+            )
         : [],
     };
 
@@ -127,11 +130,10 @@ export default async function handler(
     const centerRadius = viewportToCenterRadius(viewport);
 
     // Map recency filter to days
-    const recencyDays: Record<RecencyFilter, number> = {
+    const recencyDays: Record<Exclude<RecencyFilter, null>, number> = {
       today: 1,
       this_week: 7,
       this_month: 30,
-      null: 7, // default
     };
     const backDays = filters.recency
       ? recencyDays[filters.recency]
@@ -145,10 +147,14 @@ export default async function handler(
       filters.provider.length === 0 || filters.provider.includes("ebird");
     const shouldFetchInat =
       filters.provider.length === 0 || filters.provider.includes("inat");
+    const shouldFetchObis =
+      filters.provider.length === 0 || filters.provider.includes("obis");
 
-    // eBird doesn't provide photos, so skip if hasPhoto filter requires photos
+    // eBird and OBIS rarely have photos, so skip if hasPhoto filter requires photos
     const shouldFetchEbirdWithPhotoFilter =
       shouldFetchEbird && !(filters.hasPhoto === true);
+    const shouldFetchObisWithPhotoFilter =
+      shouldFetchObis && !(filters.hasPhoto === true);
 
     // Fetch from providers in parallel
     const ebirdPromise = shouldFetchEbirdWithPhotoFilter
@@ -169,15 +175,24 @@ export default async function handler(
         })
       : Promise.resolve<Observation[]>([]);
 
-    const [ebirdObservations, inatObservations] = await Promise.all([
+    const obisPromise = shouldFetchObisWithPhotoFilter
+      ? fetchRecentObis({
+          bbox,
+          recentDays,
+        })
+      : Promise.resolve<Observation[]>([]);
+
+    const [ebirdObservations, inatObservations, obisObservations] = await Promise.all([
       ebirdPromise,
       inatPromise,
+      obisPromise,
     ]);
 
     // Combine and deduplicate
     const allObservations: Observation[] = [
       ...ebirdObservations,
       ...inatObservations,
+      ...obisObservations,
     ];
 
     const deduplicated = deduplicateObservations(allObservations);
