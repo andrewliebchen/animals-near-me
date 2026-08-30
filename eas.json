@@ -18,8 +18,8 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://animals-near-me-orpin.vercel.app/api",
-        "EXPO_PUBLIC_SUPABASE_URL": "https://sofwkjjnpgoveabwpgje.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNvZndrampucGdvdmVhYndwZ2plIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc1NjUwMzgsImV4cCI6MjA4MzE0MTAzOH0.1khO3ucZ1fevWXUhUg1N6imTdrnBGVLzEiEbb1YvSZg"
+        "EXPO_PUBLIC_SUPABASE_URL": "https://veypjgkmiycksyetwodn.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZleXBqZ2ttaXlja3N5ZXR3b2RuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0NDc4NzQsImV4cCI6MjA5NjAyMzg3NH0.gaXXtW4Rv2ux_jVmRMy9Rkcv1L4K8kgdA95e5175Dps"
       }
     },
     "production": {
@@ -30,8 +30,8 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://animals-near-me-orpin.vercel.app/api",
-        "EXPO_PUBLIC_SUPABASE_URL": "https://sofwkjjnpgoveabwpgje.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNvZndrampucGdvdmVhYndwZ2plIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc1NjUwMzgsImV4cCI6MjA4MzE0MTAzOH0.1khO3ucZ1fevWXUhUg1N6imTdrnBGVLzEiEbb1YvSZg"
+        "EXPO_PUBLIC_SUPABASE_URL": "https://veypjgkmiycksyetwodn.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZleXBqZ2ttaXlja3N5ZXR3b2RuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0NDc4NzQsImV4cCI6MjA5NjAyMzg3NH0.gaXXtW4Rv2ux_jVmRMy9Rkcv1L4K8kgdA95e5175Dps"
       }
     }
   },

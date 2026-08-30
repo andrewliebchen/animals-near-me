@@ -51,3 +51,6 @@ export async function getDeviceId(): Promise<string> {
   return generatedId;
 }
 
+
+
+

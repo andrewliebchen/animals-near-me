@@ -1,5 +1,6 @@
 -- Animals Near Me - Supabase Database Schema
--- Run this in your Supabase SQL Editor to set up the database tables
+-- Safe to re-run on a shared database: creates only this app's objects.
+-- Does not DROP tables, and will not replace existing views or policies.
 
 -- 1. User Preferences Table (for filter storage)
 CREATE TABLE IF NOT EXISTS user_preferences (
@@ -8,19 +9,25 @@ CREATE TABLE IF NOT EXISTS user_preferences (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Enable Row Level Security
 ALTER TABLE user_preferences ENABLE ROW LEVEL SECURITY;
 
--- Drop existing policy if it exists (for re-running)
-DROP POLICY IF EXISTS "Allow anonymous upsert" ON user_preferences;
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'user_preferences'
+      AND policyname = 'Allow anonymous upsert'
+  ) THEN
+    CREATE POLICY "Allow anonymous upsert"
+      ON user_preferences
+      FOR ALL
+      TO anon
+      USING (true)
+      WITH CHECK (true);
+  END IF;
+END $$;
 
--- Create policy to allow anonymous inserts/updates (no authentication required)
-CREATE POLICY "Allow anonymous upsert"
-  ON user_preferences
-  FOR ALL
-  TO anon
-  USING (true)
-  WITH CHECK (true);
+GRANT SELECT, INSERT, UPDATE, DELETE ON user_preferences TO anon, authenticated;
 
 -- 2. Seen Observations Table
 CREATE TABLE IF NOT EXISTS seen_observations (
@@ -31,31 +38,46 @@ CREATE TABLE IF NOT EXISTS seen_observations (
   UNIQUE(device_id, observation_id)
 );
 
--- Create index for faster lookups
-CREATE INDEX IF NOT EXISTS idx_seen_observations_device_observation 
+CREATE INDEX IF NOT EXISTS idx_seen_observations_device_observation
   ON seen_observations(device_id, observation_id);
 
--- Enable Row Level Security
 ALTER TABLE seen_observations ENABLE ROW LEVEL SECURITY;
 
--- Drop existing policy if it exists (for re-running)
-DROP POLICY IF EXISTS "Allow anonymous access" ON seen_observations;
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'seen_observations'
+      AND policyname = 'Allow anonymous access'
+  ) THEN
+    CREATE POLICY "Allow anonymous access"
+      ON seen_observations
+      FOR ALL
+      TO anon
+      USING (true)
+      WITH CHECK (true);
+  END IF;
+END $$;
 
--- Create policy to allow anonymous access (no authentication required)
-CREATE POLICY "Allow anonymous access"
-  ON seen_observations
-  FOR ALL
-  TO anon
-  USING (true)
-  WITH CHECK (true);
+GRANT SELECT, INSERT, UPDATE, DELETE ON seen_observations TO anon, authenticated;
 
--- Optional: Create a view to see statistics
-CREATE OR REPLACE VIEW seen_observations_stats AS
-SELECT 
-  device_id,
-  COUNT(*) as total_seen,
-  MIN(seen_at) as first_seen_at,
-  MAX(seen_at) as last_seen_at
-FROM seen_observations
-GROUP BY device_id;
-
+-- Optional stats view (created only if missing; never replaced)
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_views
+    WHERE schemaname = 'public'
+      AND viewname = 'seen_observations_stats'
+  ) THEN
+    EXECUTE $view$
+      CREATE VIEW seen_observations_stats
+      WITH (security_invoker = true) AS
+      SELECT
+        device_id,
+        COUNT(*) as total_seen,
+        MIN(seen_at) as first_seen_at,
+        MAX(seen_at) as last_seen_at
+      FROM seen_observations
+      GROUP BY device_id;
+    $view$;
+  END IF;
+END $$;
