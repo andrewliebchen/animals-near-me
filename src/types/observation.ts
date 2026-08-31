@@ -29,6 +29,10 @@ export type Observation = {
   taxaBucket: TaxaBucket;
 
   photoUrl?: string;
+  // "observation" = a photo from this sighting; "taxon" = iNat species default_photo fallback
+  photoSource?: "observation" | "taxon";
+  // iNaturalist taxon default_photo, when available (for the detail carousel)
+  taxonPhotoUrl?: string;
   detailUrl?: string;
 
   // Server-calculated distance and bearing (optional)

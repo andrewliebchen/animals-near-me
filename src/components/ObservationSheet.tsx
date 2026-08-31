@@ -7,6 +7,9 @@ import {
   Linking,
   TouchableOpacity,
   ScrollView,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
+  LayoutChangeEvent,
   ActivityIndicator,
   Share,
 } from "react-native";
@@ -42,6 +45,8 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [displayedObservationId, setDisplayedObservationId] = useState<string | null>(null);
+  const [photoIndex, setPhotoIndex] = useState(0);
+  const [carouselWidth, setCarouselWidth] = useState(0);
 
   // Callback ref to know when BottomSheet is mounted
   const setSheetRef = React.useCallback((ref: BottomSheet | null) => {
@@ -87,6 +92,7 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
       if (displayedObservationId !== observation.id) {
         setIsTransitioning(true);
         setDisplayedObservationId(observation.id);
+        setPhotoIndex(0);
         // Clear transition state after a brief delay to allow content to render
         setTimeout(() => {
           setIsTransitioning(false);
@@ -173,6 +179,45 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
     observation.provider === "obis" ? observation.raw?.datasetName : undefined;
   const attributionLicense =
     observation.provider === "obis" ? observation.raw?.license : undefined;
+
+  const taxonPhotoUrl =
+    observation.taxonPhotoUrl ||
+    observation.raw?.taxon?.default_photo?.medium_url ||
+    observation.raw?.taxon?.default_photo?.square_url ||
+    observation.raw?.taxon?.default_photo?.url;
+  const hasSightingPhoto =
+    observation.photoSource === "observation" ||
+    (Boolean(observation.photoUrl) && observation.photoSource !== "taxon");
+  const carouselSlides =
+    hasSightingPhoto &&
+    observation.photoUrl &&
+    taxonPhotoUrl &&
+    taxonPhotoUrl !== observation.photoUrl
+      ? [
+          { uri: observation.photoUrl, caption: "This sighting" },
+          { uri: taxonPhotoUrl, caption: "Species" },
+        ]
+      : observation.photoUrl
+        ? [{ uri: observation.photoUrl, caption: undefined as string | undefined }]
+        : [];
+  const isCarousel = carouselSlides.length > 1;
+
+  const handleCarouselLayout = (event: LayoutChangeEvent) => {
+    const width = event.nativeEvent.layout.width;
+    if (width > 0 && width !== carouselWidth) {
+      setCarouselWidth(width);
+    }
+  };
+
+  const handleCarouselScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (carouselWidth <= 0) {
+      return;
+    }
+    const index = Math.round(event.nativeEvent.contentOffset.x / carouselWidth);
+    if (index !== photoIndex && index >= 0 && index < carouselSlides.length) {
+      setPhotoIndex(index);
+    }
+  };
 
   const handleOpenDetail = () => {
     if (observation.detailUrl) {
@@ -298,6 +343,7 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
       topInset={130}
       handleIndicatorStyle={{ backgroundColor: theme.border, width: 80 }}
       backgroundStyle={shadowStyle}
+      containerStyle={styles.sheetContainer}
     >
       <BottomSheetScrollView style={dynamicStyles.content}>
         {/* Loading overlay during transition */}
@@ -314,18 +360,69 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
         {!isTransitioning && (
           <>
             {/* Hero Image */}
-            {observation.photoUrl && (
-          <TouchableOpacity
+            {carouselSlides.length > 0 && (
+          <View
             style={dynamicStyles.imageContainer}
-            onPress={() => setImageViewerVisible(true)}
-            activeOpacity={0.9}
+            onLayout={handleCarouselLayout}
           >
-            <Image
-              source={{ uri: observation.photoUrl }}
-              style={styles.heroImage}
-              resizeMode="cover"
-            />
-          </TouchableOpacity>
+            {isCarousel && carouselWidth > 0 ? (
+              <>
+                <ScrollView
+                  horizontal
+                  pagingEnabled
+                  nestedScrollEnabled
+                  directionalLockEnabled
+                  showsHorizontalScrollIndicator={false}
+                  onMomentumScrollEnd={handleCarouselScroll}
+                >
+                  {carouselSlides.map((slide) => (
+                    <TouchableOpacity
+                      key={slide.caption ?? slide.uri}
+                      style={{ width: carouselWidth, height: "100%" }}
+                      onPress={() => setImageViewerVisible(true)}
+                      activeOpacity={0.9}
+                    >
+                      <Image
+                        source={{ uri: slide.uri }}
+                        style={styles.heroImage}
+                        resizeMode="cover"
+                      />
+                      {slide.caption ? (
+                        <View style={styles.captionBadge}>
+                          <Text style={styles.captionText} allowFontScaling={true}>
+                            {slide.caption}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <View style={styles.dots} pointerEvents="none">
+                  {carouselSlides.map((slide, index) => (
+                    <View
+                      key={slide.caption ?? slide.uri}
+                      style={[
+                        styles.dot,
+                        index === photoIndex && styles.dotActive,
+                      ]}
+                    />
+                  ))}
+                </View>
+              </>
+            ) : (
+              <TouchableOpacity
+                style={styles.heroImage}
+                onPress={() => setImageViewerVisible(true)}
+                activeOpacity={0.9}
+              >
+                <Image
+                  source={{ uri: carouselSlides[0].uri }}
+                  style={styles.heroImage}
+                  resizeMode="cover"
+                />
+              </TouchableOpacity>
+            )}
+          </View>
         )}
 
         {/* Names and Share Button */}
@@ -445,10 +542,11 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
       </BottomSheetScrollView>
     </BottomSheet>
 
-    {observation.photoUrl && (
+    {carouselSlides.length > 0 && (
       <ImageViewing
-        images={[{ uri: observation.photoUrl }]}
-        imageIndex={0}
+        key={observation.id}
+        images={carouselSlides.map((slide) => ({ uri: slide.uri }))}
+        imageIndex={photoIndex}
         visible={imageViewerVisible}
         onRequestClose={() => setImageViewerVisible(false)}
       />
@@ -458,6 +556,9 @@ export const ObservationSheet: React.FC<ObservationSheetProps> = ({
 };
 
 const styles = StyleSheet.create({
+  sheetContainer: {
+    zIndex: 20,
+  },
   content: {
     flex: 1,
     paddingHorizontal: 16,
@@ -473,6 +574,38 @@ const styles = StyleSheet.create({
   heroImage: {
     width: "100%",
     height: "100%",
+  },
+  captionBadge: {
+    position: "absolute",
+    left: 10,
+    top: 10,
+    backgroundColor: "rgba(0, 0, 0, 0.55)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  captionText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  dots: {
+    position: "absolute",
+    bottom: 10,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 6,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "rgba(255, 255, 255, 0.45)",
+  },
+  dotActive: {
+    backgroundColor: "#FFFFFF",
   },
   header: {
     flexDirection: "row",

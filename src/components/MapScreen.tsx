@@ -8,15 +8,16 @@ import { Ionicons } from "@expo/vector-icons";
 import { fetchObservationById, fetchObservations } from "../api/client";
 import { ObservationMarker } from "./ObservationMarker";
 import { ClusterMarker } from "./ClusterMarker";
-import { DEFAULT_REGION, regionToViewportParams } from "../utils/viewport";
+import { DEFAULT_REGION, regionToViewportParams, distanceKm } from "../utils/viewport";
 import { ObservationSheet } from "./ObservationSheet";
+import { ObservationListSheet, LIST_SHEET_PEEK_HEIGHT } from "./ObservationListSheet";
 import { ErrorState } from "./ErrorState";
-import { ColorLegend } from "./ColorLegend";
 import { FilterSheet } from "./FilterSheet";
 import { Header } from "./Header";
 import { countActiveFilters, DEFAULT_FILTERS, type FilterParams } from "../types/filters";
 import { useTheme } from "../utils/theme";
 import { useDeepLink } from "../context/DeepLinkContext";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Observation } from "../types/observation";
 import { loadFilters, saveFilters } from "../services/filters";
 import { getSeenObservationIds, markObservationAsSeen as markObservationAsSeenService } from "../services/seenObservations";
@@ -84,6 +85,8 @@ function useDebounce<T extends (...args: any[]) => void>(
 
 export const MapScreen: React.FC = () => {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
+  const peekHeight = LIST_SHEET_PEEK_HEIGHT + insets.bottom;
   const { deepLinkedObservation, setDeepLinkedObservation } = useDeepLink();
 
   // State
@@ -101,11 +104,16 @@ export const MapScreen: React.FC = () => {
   // Refs
   const mapRef = useRef<any>(null);
   const initialRegionRef = useRef<Region | null>(null);
-  const [showLegend, setShowLegend] = useState(false);
   const [showFilterSheet, setShowFilterSheet] = useState(false);
   const isZoomingIntoClusterRef = useRef(false);
   const lastCenteredObservationIdRef = useRef<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const userLocationRef = useRef<{ latitude: number; longitude: number } | null>(null);
+  userLocationRef.current = userLocation;
+  const listSnapIndexRef = useRef(0);
+  const savedListSnapIndexRef = useRef(0);
+  const selectedObservationRef = useRef<Observation | null>(null);
+  selectedObservationRef.current = selectedObservation;
   const viewportAbortControllerRef = useRef<AbortController | null>(null);
 
   // Fetch observations for viewport
@@ -152,43 +160,15 @@ export const MapScreen: React.FC = () => {
       if (filtersToUse) {
         // Filters were explicitly provided (filter changed), replace completely
         mergedObservations = newObservations;
-      } else if (userLocation) {
-        // For feed view: replace with new observations to maintain distance-based sorting
-        // The server has already sorted by distance, so we should preserve that order
-        const observationMap = new Map<string, Observation>();
-        
-        // Add new observations first (they're already sorted by distance from server)
-        newObservations.forEach(obs => {
-          observationMap.set(obs.id, obs);
-        });
-        
-        // Only add existing observations that aren't in the new set (for continuity)
-        // But we need to re-sort to maintain distance order
-        observations.forEach(obs => {
-          if (!observationMap.has(obs.id)) {
-            observationMap.set(obs.id, obs);
-          }
-        });
-        
-        // Convert to array and re-sort by distance to maintain correct order
-        mergedObservations = Array.from(observationMap.values());
-        mergedObservations.sort((a, b) => {
-          const distA = a.distance ?? Infinity;
-          const distB = b.distance ?? Infinity;
-          return distA - distB;
-        });
       } else {
-        // For map view: merge to preserve cluster counts when zooming
+        // Merge to preserve cluster counts when zooming
         const observationMap = new Map<string, Observation>();
-        // Add existing observations to map
         observations.forEach(obs => {
           observationMap.set(obs.id, obs);
         });
-        // Add/update with new observations
         newObservations.forEach(obs => {
           observationMap.set(obs.id, obs);
         });
-        // Convert back to array (order doesn't matter for map view)
         mergedObservations = Array.from(observationMap.values());
       }
       
@@ -220,8 +200,7 @@ export const MapScreen: React.FC = () => {
     const filtersChanged = JSON.stringify(currentFilters) !== JSON.stringify(newFilters);
     if (filtersChanged && viewport) {
       setObservations([]); // Clear to trigger refetch
-      // Pass newFilters explicitly to use the updated filters immediately
-      fetchObservationsForViewport(viewport, undefined, newFilters);
+      fetchObservationsForViewport(viewport, userLocationRef.current ?? undefined, newFilters);
     }
   }, [filters, viewport, fetchObservationsForViewport]);
 
@@ -264,6 +243,27 @@ export const MapScreen: React.FC = () => {
       return latDiff <= latPadding && lngDiff <= lngPadding;
     });
   }, [observations, viewport, filters.showNewOnly, seenObservationIds]);
+
+  const listObservations = React.useMemo(() => {
+    const originLat = userLocation?.latitude ?? viewport?.latitude;
+    const originLng = userLocation?.longitude ?? viewport?.longitude;
+    if (originLat == null || originLng == null) {
+      return filteredObservations;
+    }
+
+    return [...filteredObservations]
+      .map((obs) => {
+        if (obs.distance != null && isFinite(obs.distance)) {
+          return obs;
+        }
+        const dist = distanceKm(originLat, originLng, obs.lat, obs.lng);
+        return {
+          ...obs,
+          distance: isFinite(dist) ? dist : undefined,
+        };
+      })
+      .sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity));
+  }, [filteredObservations, userLocation, viewport]);
 
   // Limit markers at low zoom for performance
   const MAX_MARKERS = 500;
@@ -354,17 +354,25 @@ export const MapScreen: React.FC = () => {
       
       setViewport(region);
       
-      // Don't refetch if we're programmatically zooming into a cluster
-      // This prevents markers from disappearing when zooming in
+      // Don't refetch while we're centering on a selected animal
       if (isZoomingIntoClusterRef.current) {
-        // Reset the flag after a short delay to allow normal fetching to resume
         setTimeout(() => {
           isZoomingIntoClusterRef.current = false;
         }, 1000);
         return;
       }
+
+      // Don't refetch while the list is fully expanded (avoids jumping as the map recenters)
+      if (listSnapIndexRef.current >= 2) {
+        return;
+      }
+
+      // Don't refetch while the detail sheet is open — the map is just focusing a pin
+      if (selectedObservationRef.current) {
+        return;
+      }
       
-      debouncedFetch(region);
+      debouncedFetch(region, userLocationRef.current ?? undefined);
     },
     [debouncedFetch]
   );
@@ -524,21 +532,20 @@ export const MapScreen: React.FC = () => {
         // Set flag to prevent refetching when centering on observation
         isZoomingIntoClusterRef.current = true;
 
-        // Adjust center point to position marker higher on screen (accounting for bottom sheet)
-        // Move center slightly south (lower latitude) so marker appears in upper portion of visible area
-        const verticalOffset = viewport.latitudeDelta * 0.15; // 15% of viewport height upward
+        const FOCUS_DELTA = 0.015;
+        const latDelta = Math.min(viewport.latitudeDelta, FOCUS_DELTA);
+        const lngDelta = Math.min(viewport.longitudeDelta, FOCUS_DELTA);
+        const verticalOffset = latDelta * 0.2;
         const adjustedLatitude = selectedObservation.lat - verticalOffset;
 
-        // Animate to the adjusted coordinate, keeping current zoom level
-        // This ensures the marker is visible and positioned higher to avoid bottom sheet
         mapRef.current.animateToRegion(
           {
             latitude: adjustedLatitude,
             longitude: selectedObservation.lng,
-            latitudeDelta: viewport.latitudeDelta,
-            longitudeDelta: viewport.longitudeDelta,
+            latitudeDelta: latDelta,
+            longitudeDelta: lngDelta,
           },
-          300
+          400
         );
 
         // Track that we've centered on this observation
@@ -547,7 +554,7 @@ export const MapScreen: React.FC = () => {
         // Reset the flag after animation completes
         setTimeout(() => {
           isZoomingIntoClusterRef.current = false;
-        }, 500);
+        }, 1000);
       }
     } else if (!selectedObservation) {
       // Clear the last centered ID when no observation is selected
@@ -555,10 +562,21 @@ export const MapScreen: React.FC = () => {
     }
   }, [selectedObservation, viewport]);
 
+  const handleSelectObservation = useCallback((observation: Observation) => {
+    if (!selectedObservation) {
+      savedListSnapIndexRef.current = Math.max(0, listSnapIndexRef.current);
+    }
+    setSelectedObservation(observation);
+  }, [selectedObservation]);
+
+  const handleCloseObservation = useCallback(() => {
+    setSelectedObservation(null);
+  }, []);
+
   const handleRetry = useCallback(() => {
     setError(null);
     if (viewport) {
-      fetchObservationsForViewport(viewport);
+      fetchObservationsForViewport(viewport, userLocationRef.current ?? undefined);
     }
   }, [viewport, fetchObservationsForViewport]);
 
@@ -653,7 +671,7 @@ export const MapScreen: React.FC = () => {
             edgePadding: {
               top: 150,
               right: 150,
-              bottom: 150,
+              bottom: 150 + peekHeight,
               left: 150,
             },
             animated: true,
@@ -680,7 +698,7 @@ export const MapScreen: React.FC = () => {
         300
       );
     },
-    [viewport]
+    [viewport, peekHeight]
   );
 
   // Render function for clusters
@@ -738,7 +756,6 @@ export const MapScreen: React.FC = () => {
           onRegionChangeComplete={handleRegionChangeComplete}
           showsUserLocation={true}
           showsMyLocationButton={true}
-          onLongPress={() => setShowLegend(!showLegend)}
           clusteringEnabled={viewport ? viewport.latitudeDelta >= 0.03 : true}
           clusterColor="#2563EB"
           clusterTextColor="#FFFFFF"
@@ -753,6 +770,12 @@ export const MapScreen: React.FC = () => {
           spiralEnabled={false}
           mapType="terrain"
           customMapStyle={CUSTOM_MAP_STYLE}
+          mapPadding={{
+            top: 0,
+            right: 0,
+            bottom: selectedObservation ? 0 : peekHeight,
+            left: 0,
+          }}
         >
             {displayedObservations.map((item) => {
               const isSeen = seenObservationIds.has(item.observation.id);
@@ -760,7 +783,7 @@ export const MapScreen: React.FC = () => {
                 <ObservationMarker
                   key={item.observation.id}
                   observation={item.observation}
-                  onPress={setSelectedObservation}
+                  onPress={handleSelectObservation}
                   coordinate={{
                     latitude: item.observation.lat,
                     longitude: item.observation.lng,
@@ -775,7 +798,6 @@ export const MapScreen: React.FC = () => {
 
         <>
           {error && <ErrorState error={error} onRetry={handleRetry} />}
-          <ColorLegend visible={showLegend} />
 
           {/* Filter Button - Map View */}
             <TouchableOpacity
@@ -829,10 +851,25 @@ export const MapScreen: React.FC = () => {
         </>
       </View>
 
+      {/* Observation list sheet */}
+      <ObservationListSheet
+        observations={listObservations}
+        seenObservationIds={seenObservationIds}
+        selectedId={selectedObservation?.id}
+        isLoading={isLoading}
+        peekHeight={peekHeight}
+        visible={!selectedObservation}
+        restoreIndex={savedListSnapIndexRef.current}
+        onSelect={handleSelectObservation}
+        onSnapIndexChange={(index) => {
+          listSnapIndexRef.current = index;
+        }}
+      />
+
       {/* ObservationSheet */}
       <ObservationSheet
         observation={selectedObservation}
-        onClose={() => setSelectedObservation(null)}
+        onClose={handleCloseObservation}
       />
 
       <FilterSheet

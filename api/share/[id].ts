@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { normalizeInat } from "../../server/providers/normalize";
 import { fetchObisById } from "../../server/providers/obis";
+import { enrichObservationPhotos } from "../../server/providers/inatTaxonPhotos";
 import type { Observation } from "../../src/types/observation";
 
 const INAT_BASE_URL = "https://api.inaturalist.org/v1";
@@ -120,6 +121,9 @@ export default async function handler(
     if (!observation) {
       return res.status(404).json({ error: "Observation not found" });
     }
+
+    const [enriched] = await enrichObservationPhotos([observation]);
+    observation = enriched ?? observation;
 
     // Check if request wants JSON (from app)
     const wantsJson = req.headers.accept?.includes("application/json") || 

@@ -54,11 +54,19 @@ export function normalizeInat(inatData: any): Observation {
   const taxon = inatData.taxon || {};
   const photos = inatData.photos || [];
   const bestPhoto = photos[0] || {};
-  
-  // Get photo URL (prefer medium, fallback to small)
+  const taxonPhoto = taxon.default_photo || {};
+  const taxonPhotoUrl =
+    taxonPhoto.medium_url || taxonPhoto.square_url || taxonPhoto.url || undefined;
+
+  // Prefer the observation photo; fall back to the taxon's default photo
   let photoUrl: string | undefined;
+  let photoSource: Observation["photoSource"];
   if (bestPhoto.url) {
     photoUrl = bestPhoto.url.replace("square", "medium") || bestPhoto.url;
+    photoSource = "observation";
+  } else if (taxonPhotoUrl) {
+    photoUrl = taxonPhotoUrl;
+    photoSource = "taxon";
   }
 
   return {
@@ -74,6 +82,8 @@ export function normalizeInat(inatData: any): Observation {
     scientificName: taxon.name,
     taxaBucket: mapInatTaxa(taxon.iconic_taxon_name),
     photoUrl,
+    photoSource,
+    taxonPhotoUrl,
     detailUrl: `https://www.inaturalist.org/observations/${inatData.id}`,
     raw: inatData,
   };
@@ -177,6 +187,7 @@ export function normalizeObis(obisData: any): Observation | null {
     : isReceiverDetection
       ? "Detected at receiver"
       : locality;
+  const mediaUrl = firstMediaUrl(obisData.associatedMedia);
 
   return {
     id: `obis-${obisId}`,
@@ -188,7 +199,8 @@ export function normalizeObis(obisData: any): Observation | null {
     commonName: obisData.vernacularName || obisData.scientificName,
     scientificName: obisData.scientificName,
     taxaBucket: mapObisTaxa(obisData.class, obisData.phylum, obisData.kingdom),
-    photoUrl: firstMediaUrl(obisData.associatedMedia),
+    photoUrl: mediaUrl,
+    photoSource: mediaUrl ? "observation" : undefined,
     detailUrl,
     raw: obisData,
   };

@@ -233,6 +233,7 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
       topInset={130}
       handleIndicatorStyle={{ backgroundColor: theme.border, width: 80 }}
       backgroundStyle={shadowStyle}
+      containerStyle={styles.sheetContainer}
       footerComponent={footerComponent}
       enableOverDrag={false}
     >
@@ -364,6 +365,9 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
 };
 
 const styles = StyleSheet.create({
+  sheetContainer: {
+    zIndex: 30,
+  },
   container: {
     flex: 1,
     flexDirection: "column",

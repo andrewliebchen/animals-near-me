@@ -5,6 +5,7 @@ import { fetchRecentObis } from "../../server/providers/obis";
 import { viewportToBoundingBox, viewportToCenterRadius, distanceKm, bearing } from "../../server/utils/viewport";
 import { deduplicateObservations } from "../../server/utils/dedupe";
 import { getCacheKey, getCached, setCached } from "../../server/utils/cache";
+import { enrichObservationPhotos, hasSightingPhoto } from "../../server/providers/inatTaxonPhotos";
 import type { Observation, Provider, TaxaBucket } from "../../src/types/observation";
 import type { FilterParams, RecencyFilter } from "../../src/types/filters";
 
@@ -214,12 +215,14 @@ export default async function handler(
       );
     }
 
-    // Filter by photo
+    // Filter by original sighting photos only (taxon fallbacks do not count)
     if (filters.hasPhoto === true) {
-      filtered = filtered.filter((obs) => obs.photoUrl !== undefined);
+      filtered = filtered.filter(hasSightingPhoto);
     } else if (filters.hasPhoto === false) {
-      filtered = filtered.filter((obs) => obs.photoUrl === undefined);
+      filtered = filtered.filter((obs) => !hasSightingPhoto(obs));
     }
+
+    filtered = await enrichObservationPhotos(filtered);
 
     // Calculate distances and bearings if user location provided
     let processedObservations = filtered;
