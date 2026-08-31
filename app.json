@@ -21,7 +21,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.animalsnearme.app",
-      "buildNumber": "20",
+      "buildNumber": "30",
       "icon": "./assets/icon.png",
       "splash": {
         "image": "./assets/splash.png",
